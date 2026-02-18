@@ -1,32 +1,12 @@
--- Create a table for public profiles
-create table profiles (
-  id uuid references auth.users on delete cascade not null primary key,
-  updated_at timestamp with time zone,
-  name text,
-  age text,
-  weight text,
-  height text,
-  gender text,
-  activity_level text,
-  daily_carb_limit numeric
-);
+# הגדרת מסד הנתונים
 
--- Set up Row Level Security (RLS)
--- See https://supabase.com/docs/guides/auth/row-level-security for more details.
-alter table profiles enable row level security;
+## שלב 1: צור את טבלת המזונות
 
-create policy "Public profiles are viewable by everyone." on profiles
-  for select using (true);
+כנס ל-[Supabase Dashboard](https://supabase.com/dashboard) ועבור ל-SQL Editor.
 
-create policy "Users can insert their own profile." on profiles
-  for insert with check (auth.uid() = id);
+העתק והדבק את הקוד הבא:
 
-create policy "Users can update own profile." on profiles
-  for update using (auth.uid() = id);
-
--- This triggers a profile creation when a user signs up (Optional, but good for Email/Pass)
--- For Anon auth, we usually insert manually on first save.
-
+```sql
 -- Create a table for food items database
 create table food_items (
   id uuid default gen_random_uuid() primary key,
@@ -88,3 +68,12 @@ insert into food_items (name, name_hebrew, calories, protein, fat, carbs, fiber,
   ('Cheese (Cheddar)', 'גבינה צהובה', 402, 25, 33, 1.3, 0, 0.5, '100g', 'חלבון'),
   ('Greek Yogurt', 'יוגורט יווני', 59, 10, 0.4, 3.6, 0, 3.2, '100g', 'חלבון'),
   ('Cottage Cheese', 'גבינת קוטג', 98, 11, 4.3, 3.4, 0, 2.7, '100g', 'חלבון');
+```
+
+## שלב 2: וודא שהטבלה נוצרה
+
+בדוק שהטבלה `food_items` מופיעה ברשימת הטבלאות שלך.
+
+## ✅ זהו!
+
+עכשיו האפליקציה תוכל לחפש מזונות הן במאגר והן עם AI בזמן אמת.

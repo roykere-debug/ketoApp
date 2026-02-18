@@ -24,9 +24,12 @@ export default function ScannerScreen() {
 
     if (!permission.granted) {
         return (
-            <SafeAreaView className="flex-1 justify-center items-center p-6 bg-background">
-                <Camera size={64} color="#800020" />
-                <Text className="text-center mb-4 text-lg mt-4">אנו צריכים אישור למצלמה כדי לסרוק את האוכל</Text>
+            <SafeAreaView className="flex-1 justify-center items-center p-6 bg-[#F8F9FA]">
+                <View className="w-28 h-28 rounded-3xl bg-[#800020]/10 items-center justify-center mb-6">
+                    <Camera size={64} color="#800020" strokeWidth={2} />
+                </View>
+                <Text className="text-center mb-2 text-2xl font-extrabold">נדרשת הרשאת מצלמה</Text>
+                <Text className="text-center mb-8 text-base font-semibold text-gray-400">אנו צריכים אישור למצלמה כדי לסרוק את האוכל</Text>
                 <Button label="אפשר גישה למצלמה" onPress={requestPermission} />
             </SafeAreaView>
         );
@@ -90,79 +93,105 @@ export default function ScannerScreen() {
                 facing="back"
             >
                 <SafeAreaView className="flex-1 justify-between p-6">
-                    <Text className="text-white text-center text-xl font-bold bg-black/50 p-3 rounded-2xl self-center">
+                    <Text className="text-white text-center text-xl font-extrabold bg-black/60 px-6 py-4 rounded-3xl self-center">
                         צלם את המנה שלך
                     </Text>
                     <View className="items-center mb-10">
                         <TouchableOpacity
                             onPress={handleScan}
-                            className="w-20 h-20 bg-white rounded-full border-4 border-primary items-center justify-center"
+                            className="w-24 h-24 bg-white rounded-full border-4 border-primary items-center justify-center"
                             activeOpacity={0.8}
+                            style={{
+                                shadowColor: "#000",
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 12,
+                                elevation: 8,
+                            }}
                         >
-                            <View className="w-16 h-16 bg-primary rounded-full" />
+                            <View className="w-20 h-20 bg-primary rounded-full" />
                         </TouchableOpacity>
-                        <Text className="text-white mt-3 text-sm">לחץ לצילום</Text>
+                        <Text className="text-white mt-4 text-base font-bold">לחץ לצילום</Text>
                     </View>
                 </SafeAreaView>
             </CameraView>
 
             <Modal visible={analyzing} transparent animationType="fade">
-                <View className="flex-1 bg-black/80 justify-center items-center">
-                    <ActivityIndicator size="large" color="#800020" />
-                    <Text className="text-white mt-4 font-bold text-lg">מנתח את המנה...</Text>
-                    <Text className="text-white/70 mt-2 text-sm">זה יכול לקחת כמה שניות</Text>
+                <View className="flex-1 bg-black/80 justify-center items-center px-8">
+                    <View 
+                        className="bg-white rounded-3xl p-8 items-center w-full max-w-xs"
+                        style={{
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 16,
+                            elevation: 10,
+                        }}
+                    >
+                        <ActivityIndicator size="large" color="#800020" />
+                        <Text className="mt-5 font-extrabold text-xl text-center">מנתח את המנה...</Text>
+                        <Text className="text-gray-400 mt-2 text-sm font-semibold text-center">זה יכול לקחת כמה שניות</Text>
+                    </View>
                 </View>
             </Modal>
 
             <Modal visible={!!result} animationType="slide" presentationStyle="pageSheet">
                 {result && (
-                    <SafeAreaView className="flex-1 bg-background">
-                        <View className="flex-row-reverse justify-between items-center p-4 border-b border-border">
-                            <Text className="text-xl font-bold">תוצאות הסריקה</Text>
-                            <TouchableOpacity onPress={() => setResult(null)} className="p-2">
-                                <X size={24} color="#666" />
+                    <SafeAreaView className="flex-1 bg-[#F8F9FA]">
+                        <View className="flex-row-reverse justify-between items-center px-5 py-4">
+                            <Text className="text-2xl font-extrabold">תוצאות הסריקה</Text>
+                            <TouchableOpacity 
+                                onPress={() => setResult(null)} 
+                                className="w-12 h-12 items-center justify-center rounded-2xl bg-gray-100"
+                                activeOpacity={0.7}
+                            >
+                                <X size={24} color="#666" strokeWidth={2.5} />
                             </TouchableOpacity>
                         </View>
                         
-                        <ScrollView className="flex-1 p-4">
+                        <ScrollView 
+                            className="flex-1 px-5"
+                            contentContainerStyle={{ paddingBottom: 40, paddingTop: 8 }}
+                            showsVerticalScrollIndicator={false}
+                        >
                             {/* Keto Score - Big */}
-                            <Card className={`p-6 mb-4 ${getScoreColor(result.ketoScore)}`}>
+                            <Card className={`p-8 mb-5 ${getScoreColor(result.ketoScore)}`}>
                                 <View className="items-center">
-                                    <Text className="text-white text-lg mb-2">ציון קיטו</Text>
-                                    <Text className="text-white text-5xl font-bold">{result.ketoScore}</Text>
-                                    <Text className="text-white/90 mt-2">{getScoreText(result.ketoScore)}</Text>
+                                    <Text className="text-white text-base font-extrabold mb-3">ציון קיטו</Text>
+                                    <Text className="text-white text-7xl font-extrabold">{result.ketoScore}</Text>
+                                    <Text className="text-white/95 mt-4 text-base font-bold">{getScoreText(result.ketoScore)}</Text>
                                 </View>
                             </Card>
 
                             {/* Food Info */}
-                            <Card className="p-4 mb-4">
-                                <Text className="text-2xl font-bold mb-1 text-right">{result.name}</Text>
-                                <Text className="text-muted-foreground mb-4 text-right">{result.explanation}</Text>
+                            <Card className="p-6 mb-5">
+                                <Text className="text-3xl font-extrabold mb-2 text-right leading-9">{result.name}</Text>
+                                <Text className="text-gray-500 font-semibold mb-5 text-right text-base leading-6">{result.explanation}</Text>
 
-                                <View className="flex-row-reverse justify-between py-3 border-t border-border">
-                                    <Text className="font-bold">קלוריות</Text>
-                                    <Text className="text-lg font-bold text-primary">{result.calories}</Text>
+                                <View className="flex-row-reverse justify-between py-4 border-t border-gray-100">
+                                    <Text className="font-extrabold text-base">קלוריות</Text>
+                                    <Text className="text-xl font-extrabold text-primary">{result.calories}</Text>
                                 </View>
 
-                                <View className="flex-row-reverse justify-between py-3 border-t border-border">
-                                    <Text className="font-bold">פחמימות</Text>
-                                    <Text className={`text-lg font-bold ${result.carbs > 10 ? "text-red-500" : "text-green-500"}`}>
+                                <View className="flex-row-reverse justify-between py-4 border-t border-gray-100">
+                                    <Text className="font-extrabold text-base">פחמימות</Text>
+                                    <Text className={`text-xl font-extrabold ${result.carbs > 10 ? "text-red-500" : "text-green-500"}`}>
                                         {result.carbs}g
                                     </Text>
                                 </View>
 
-                                <View className="flex-row-reverse justify-between py-3 border-t border-border">
-                                    <Text className="font-bold">שומן</Text>
-                                    <Text className="text-lg">{result.fat}g</Text>
+                                <View className="flex-row-reverse justify-between py-4 border-t border-gray-100">
+                                    <Text className="font-extrabold text-base">שומן</Text>
+                                    <Text className="text-xl font-extrabold">{result.fat}g</Text>
                                 </View>
 
-                                <View className="flex-row-reverse justify-between py-3 border-t border-border">
-                                    <Text className="font-bold">חלבון</Text>
-                                    <Text className="text-lg">{result.protein}g</Text>
+                                <View className="flex-row-reverse justify-between py-4 border-t border-gray-100">
+                                    <Text className="font-extrabold text-base">חלבון</Text>
+                                    <Text className="text-xl font-extrabold">{result.protein}g</Text>
                                 </View>
                             </Card>
 
-                            <Button label="הוסף ליומן" onPress={handleAddMeal} className="mb-3" />
+                            <Button label="הוסף ליומן" onPress={handleAddMeal} className="mb-4" />
                             <Button label="צלם שוב" variant="outline" onPress={() => setResult(null)} />
                         </ScrollView>
                     </SafeAreaView>

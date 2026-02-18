@@ -1,11 +1,11 @@
 import { Text as RNText, TextProps } from "react-native";
-import { cn } from "../../lib/utils"; // We need to create lib/utils
+import { cn } from "../../lib/utils";
 
 export function Text({ className, style, ...props }: TextProps) {
     return (
         <RNText
-            className={cn("text-base font-sans text-foreground text-left", className)} // 'text-left' for clean alignment, can be overridden 'text-right' for Hebrew logic if needed, but usually alignment follows direction.
-            style={style}
+            className={cn("text-base font-sans font-semibold text-foreground text-left", className)}
+            style={[{ letterSpacing: -0.2 }, style]}
             {...props}
         />
     );

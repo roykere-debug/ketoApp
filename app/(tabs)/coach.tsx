@@ -33,40 +33,61 @@ export default function CoachScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-background">
-            <View className="p-4 border-b border-border bg-card">
-                <Text className="text-xl font-bold text-primary text-center">המאמן האישי</Text>
+        <SafeAreaView className="flex-1 bg-[#F8F9FA]">
+            <View className="px-5 py-4 bg-white">
+                <Text className="text-3xl font-extrabold text-primary text-center">המאמן האישי</Text>
             </View>
 
             <ScrollView 
                 ref={scrollRef}
-                className="flex-1 p-4" 
-                contentContainerStyle={{ gap: 12 }}
+                className="flex-1 px-5 py-4" 
+                contentContainerStyle={{ gap: 16, paddingBottom: 20 }}
                 onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+                showsVerticalScrollIndicator={false}
             >
                 {messages.map((msg, idx) => (
                     <View 
                         key={idx} 
-                        className={`p-4 rounded-2xl max-w-[80%] ${
+                        className={`px-5 py-4 rounded-3xl max-w-[85%] ${
                             msg.role === 'user' 
                                 ? 'bg-primary self-start' 
-                                : 'bg-muted self-end'
+                                : 'bg-white self-end'
                         }`}
+                        style={
+                            msg.role === 'assistant'
+                                ? {
+                                      shadowColor: "#000",
+                                      shadowOffset: { width: 0, height: 2 },
+                                      shadowOpacity: 0.06,
+                                      shadowRadius: 8,
+                                      elevation: 2,
+                                  }
+                                : {}
+                        }
                     >
-                        <Text className={`${msg.role === 'user' ? 'text-white' : 'text-foreground'} text-right`}>
+                        <Text className={`${msg.role === 'user' ? 'text-white font-semibold' : 'text-foreground font-medium'} text-right leading-6`}>
                             {msg.text}
                         </Text>
                     </View>
                 ))}
                 {loading && (
-                    <View className="bg-muted self-end p-4 rounded-2xl max-w-[80%]">
-                        <Text className="text-muted-foreground text-right">מקליד...</Text>
+                    <View 
+                        className="bg-white self-end px-5 py-4 rounded-3xl max-w-[85%]"
+                        style={{
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.06,
+                            shadowRadius: 8,
+                            elevation: 2,
+                        }}
+                    >
+                        <Text className="text-gray-400 font-semibold text-right">מקליד...</Text>
                     </View>
                 )}
             </ScrollView>
 
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={100}>
-                <View className="p-4 border-t border-border flex-row-reverse gap-2 bg-background">
+                <View className="px-5 py-4 flex-row-reverse gap-3 bg-white border-t border-gray-100">
                     <Input
                         className="flex-1"
                         placeholder="כתוב הודעה..."
@@ -77,7 +98,7 @@ export default function CoachScreen() {
                     />
                     <Button 
                         label={loading ? "..." : "שלח"} 
-                        className="w-20" 
+                        className="w-24" 
                         onPress={handleSend}
                         disabled={loading}
                     />

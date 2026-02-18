@@ -13,31 +13,41 @@ export function Button({
     variant = "default",
     size = "default",
     label,
+    style,
     ...props
 }: ButtonProps) {
 
-    const baseStyles = "flex-row items-center justify-center rounded-full";
+    const baseStyles = "flex-row items-center justify-center rounded-2xl";
     const variants = {
         default: "bg-primary",
         outline: "border-2 border-primary bg-transparent",
         ghost: "bg-transparent",
     };
     const sizes = {
-        default: "h-12 px-6 py-3",
-        sm: "h-9 px-4 py-2",
-        lg: "h-14 px-8 py-4",
+        default: "h-14 px-7 py-4",
+        sm: "h-10 px-4 py-2",
+        lg: "h-16 px-9 py-5",
     };
 
     const textStyles = {
-        default: "text-white font-bold",
-        outline: "text-primary font-bold",
-        ghost: "text-primary font-medium",
+        default: "text-white font-extrabold text-base",
+        outline: "text-primary font-extrabold text-base",
+        ghost: "text-primary font-bold text-base",
     };
+
+    const shadowStyles = variant === "default" ? {
+        shadowColor: "#800020",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 5,
+    } : {};
 
     return (
         <TouchableOpacity
             className={cn(baseStyles, variants[variant], sizes[size], className)}
-            activeOpacity={0.7}
+            style={[shadowStyles, style]}
+            activeOpacity={0.8}
             {...props}
         >
             <Text className={cn(textStyles[variant])}>{label}</Text>

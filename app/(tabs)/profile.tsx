@@ -31,18 +31,22 @@ export default function ProfileScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-background">
-            <ScrollView contentContainerClassName="p-4 gap-4">
+        <SafeAreaView className="flex-1 bg-[#F8F9FA]">
+            <ScrollView 
+                contentContainerClassName="p-5 gap-5"
+                contentContainerStyle={{ paddingBottom: 40 }}
+                showsVerticalScrollIndicator={false}
+            >
                 <View className="mb-2">
-                    <Text className="text-3xl font-bold text-primary text-right">פרופיל</Text>
-                    <Text className="text-muted-foreground text-right">נהל את הנתונים האישיים שלך</Text>
+                    <Text className="text-4xl font-extrabold text-primary text-right">פרופיל</Text>
+                    <Text className="text-sm font-bold text-gray-400 text-right mt-1">נהל את הנתונים האישיים שלך</Text>
                 </View>
 
-                <Card className="p-4 gap-4">
-                    <Text className="text-lg font-bold text-right">פרטים אישיים</Text>
+                <Card className="p-6 gap-5">
+                    <Text className="text-xl font-extrabold text-right">פרטים אישיים</Text>
 
                     <View>
-                        <Text className="mb-2 text-sm font-medium text-right">שם מלא</Text>
+                        <Text className="mb-2.5 text-sm font-bold text-gray-600 text-right">שם מלא</Text>
                         <Input
                             value={form.name}
                             onChangeText={(t) => setForm(p => ({ ...p, name: t }))}
@@ -53,7 +57,7 @@ export default function ProfileScreen() {
 
                     <View className="flex-row-reverse gap-4">
                         <View className="flex-1">
-                            <Text className="mb-2 text-sm font-medium text-right">גיל</Text>
+                            <Text className="mb-2.5 text-sm font-bold text-gray-600 text-right">גיל</Text>
                             <Input
                                 value={form.age}
                                 onChangeText={(t) => setForm(p => ({ ...p, age: t }))}
@@ -63,7 +67,7 @@ export default function ProfileScreen() {
                             />
                         </View>
                         <View className="flex-1">
-                            <Text className="mb-2 text-sm font-medium text-right">מין</Text>
+                            <Text className="mb-2.5 text-sm font-bold text-gray-600 text-right">מין</Text>
                             <Input
                                 value={form.gender === 'male' ? 'זכר' : 'נקבה'}
                                 onChangeText={() => setForm(p => ({ ...p, gender: p.gender === 'male' ? 'female' : 'male' }))}
@@ -74,12 +78,12 @@ export default function ProfileScreen() {
                     </View>
                 </Card>
 
-                <Card className="p-4 gap-4">
-                    <Text className="text-lg font-bold text-right">מדדי גוף</Text>
+                <Card className="p-6 gap-5">
+                    <Text className="text-xl font-extrabold text-right">מדדי גוף</Text>
 
                     <View className="flex-row-reverse gap-4">
                         <View className="flex-1">
-                            <Text className="mb-2 text-sm font-medium text-right">משקל (ק״ג)</Text>
+                            <Text className="mb-2.5 text-sm font-bold text-gray-600 text-right">משקל (ק״ג)</Text>
                             <Input
                                 value={form.weight}
                                 onChangeText={(t) => setForm(p => ({ ...p, weight: t }))}
@@ -89,7 +93,7 @@ export default function ProfileScreen() {
                             />
                         </View>
                         <View className="flex-1">
-                            <Text className="mb-2 text-sm font-medium text-right">גובה (ס״מ)</Text>
+                            <Text className="mb-2.5 text-sm font-bold text-gray-600 text-right">גובה (ס״מ)</Text>
                             <Input
                                 value={form.height}
                                 onChangeText={(t) => setForm(p => ({ ...p, height: t }))}
@@ -103,15 +107,13 @@ export default function ProfileScreen() {
                     <Button label="שמור ועדכן יעדים" onPress={handleSave} />
                 </Card>
 
-                <Card className="p-4 flex-row-reverse justify-between items-center">
+                <Card className="p-6 flex-row-reverse justify-between items-center">
                     <View>
-                        <Text className="text-lg font-bold text-right">Apple Health</Text>
-                        <Text className="text-sm text-muted-foreground text-right">סנכרון צעדים ופעילות</Text>
+                        <Text className="text-xl font-extrabold text-right">Apple Health</Text>
+                        <Text className="text-sm font-semibold text-gray-400 text-right mt-1">סנכרון צעדים ופעילות</Text>
                     </View>
                     <Switch value={false} onValueChange={() => { }} />
                 </Card>
-
-                <View className="h-10" />
             </ScrollView>
         </SafeAreaView>
     );

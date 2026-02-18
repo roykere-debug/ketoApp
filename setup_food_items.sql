@@ -1,34 +1,5 @@
--- Create a table for public profiles
-create table profiles (
-  id uuid references auth.users on delete cascade not null primary key,
-  updated_at timestamp with time zone,
-  name text,
-  age text,
-  weight text,
-  height text,
-  gender text,
-  activity_level text,
-  daily_carb_limit numeric
-);
-
--- Set up Row Level Security (RLS)
--- See https://supabase.com/docs/guides/auth/row-level-security for more details.
-alter table profiles enable row level security;
-
-create policy "Public profiles are viewable by everyone." on profiles
-  for select using (true);
-
-create policy "Users can insert their own profile." on profiles
-  for insert with check (auth.uid() = id);
-
-create policy "Users can update own profile." on profiles
-  for update using (auth.uid() = id);
-
--- This triggers a profile creation when a user signs up (Optional, but good for Email/Pass)
--- For Anon auth, we usually insert manually on first save.
-
 -- Create a table for food items database
-create table food_items (
+create table if not exists food_items (
   id uuid default gen_random_uuid() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   name text not null,
@@ -50,6 +21,11 @@ create table food_items (
 -- Set up Row Level Security (RLS)
 alter table food_items enable row level security;
 
+-- Drop existing policies if they exist
+drop policy if exists "Food items are viewable by everyone." on food_items;
+drop policy if exists "Authenticated users can insert food items." on food_items;
+drop policy if exists "Users can update own food items." on food_items;
+
 -- Everyone can read food items
 create policy "Food items are viewable by everyone." on food_items
   for select using (true);
@@ -62,9 +38,9 @@ create policy "Authenticated users can insert food items." on food_items
 create policy "Users can update own food items." on food_items
   for update using (auth.uid() = created_by);
 
--- Create index for faster search
-create index food_items_name_idx on food_items using gin(to_tsvector('simple', name));
-create index food_items_name_hebrew_idx on food_items using gin(to_tsvector('simple', name_hebrew));
+-- Create indexes for faster search
+create index if not exists food_items_name_idx on food_items using gin(to_tsvector('simple', name));
+create index if not exists food_items_name_hebrew_idx on food_items using gin(to_tsvector('simple', name_hebrew));
 
 -- Insert some common food items
 insert into food_items (name, name_hebrew, calories, protein, fat, carbs, fiber, sugar, serving_size, category) values

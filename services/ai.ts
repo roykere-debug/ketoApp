@@ -79,4 +79,94 @@ export const getCoachResponse = async (history: any[], message: string): Promise
     const fullPrompt = `${systemPrompt}\nUser: ${message}`;
 
     return await callGemini(fullPrompt);
+};
+
+export type FoodNutrition = {
+    name: string;
+    name_hebrew: string;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+    fiber: number;
+    sugar: number;
+    serving_size: string;
+    category: string;
+};
+
+export const searchFoodNutrition = async (foodName: string): Promise<FoodNutrition | null> => {
+    try {
+        const prompt = `You are a nutrition database. Find nutritional information for: "${foodName}"
+        
+Return ONLY a raw JSON object (no markdown, no backticks, no explanation) with this EXACT structure:
+{
+  "name": "English name",
+  "name_hebrew": "Hebrew name",
+  "calories": number (per 100g),
+  "protein": number (grams per 100g),
+  "fat": number (grams per 100g),
+  "carbs": number (grams per 100g),
+  "fiber": number (grams per 100g),
+  "sugar": number (grams per 100g),
+  "serving_size": "100g",
+  "category": "Hebrew category (חלבון/ירקות/שומן/פירות/דגנים)"
 }
+
+If you don't know the exact values, provide your best estimate based on typical nutritional data.`;
+
+        const content = await callGemini(prompt);
+        
+        // Clean up markdown if present
+        const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        const parsed = JSON.parse(cleanContent);
+        
+        // Validate required fields
+        if (!parsed.name || typeof parsed.calories !== 'number') {
+            throw new Error('Invalid response format');
+        }
+        
+        return parsed;
+    } catch (error) {
+        console.error("Error searching food nutrition with AI:", error);
+        return null;
+    }
+};
+
+export type KetoSuggestion = {
+    suggestions: string[];
+    summary: string;
+};
+
+export const getKetoImprovementSuggestions = async (
+    currentScore: number,
+    totals: { calories: number; protein: number; fat: number; carbs: number },
+    goals: { calories: number; protein: number; fat: number; carbs: number }
+): Promise<KetoSuggestion> => {
+    const prompt = `You are a helpful Keto diet coach. The user's current keto score today is ${currentScore}/10.
+
+Their current intake today:
+- קלוריות: ${totals.calories} / ${goals.calories}
+- חלבון: ${totals.protein}g / ${goals.protein}g
+- שומן: ${totals.fat}g / ${goals.fat}g
+- פחמימות: ${totals.carbs}g / ${goals.carbs}g
+
+Provide 3-4 specific, actionable suggestions in Hebrew to improve their keto score today.
+
+Return ONLY a raw JSON object (no markdown, no backticks) with this structure:
+{
+  "summary": "Short encouraging Hebrew summary (1 sentence)",
+  "suggestions": [
+    "suggestion 1 in Hebrew",
+    "suggestion 2 in Hebrew",
+    "suggestion 3 in Hebrew"
+  ]
+}
+
+Keep suggestions specific, positive, and actionable. Focus on what they can do right now or for their next meal.`;
+
+    const content = await callGemini(prompt);
+    const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    return JSON.parse(cleanContent);
+};
