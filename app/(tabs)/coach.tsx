@@ -1,14 +1,24 @@
-import { View, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "../../components/ui/Text";
-import { Input } from "../../components/ui/Input";
-import { Button } from "../../components/ui/Button";
 import { useState, useRef } from "react";
 import { getCoachResponse } from "../../services/ai";
+import { Send } from "lucide-react-native";
+
+const C = {
+    bg: "#0A0A0C",
+    card: "#111113",
+    card2: "#18181B",
+    border: "#28282C",
+    maroon: "#800020",
+    text: "#F5F5F7",
+    textDim: "#8E8E93",
+    green: "#10b981",
+} as const;
 
 export default function CoachScreen() {
-    const [messages, setMessages] = useState<{ role: 'user' | 'assistant', text: string }[]>([
-        { role: 'assistant', text: 'היי! אני המאמן האישי שלך. מה אכלת היום או איך אני יכול לעזור?' }
+    const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([
+        { role: 'assistant', text: 'היי! אני המאמן האישי שלך לתזונה קטוגנית. מה אכלת היום, או איך אני יכול לעזור?' },
     ]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -18,90 +28,183 @@ export default function CoachScreen() {
         if (!input.trim() || loading) return;
         const userMsg = input;
         setInput("");
-        setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+        setMessages((prev) => [...prev, { role: 'user', text: userMsg }]);
         setLoading(true);
 
         try {
             const response = await getCoachResponse([], userMsg);
-            setMessages(prev => [...prev, { role: 'assistant', text: response }]);
-        } catch (e) {
-            setMessages(prev => [...prev, { role: 'assistant', text: 'סליחה, משהו השתבש. נסה שוב.' }]);
+            setMessages((prev) => [...prev, { role: 'assistant', text: response }]);
+        } catch {
+            setMessages((prev) => [...prev, { role: 'assistant', text: 'סליחה, משהו השתבש. נסה שוב.' }]);
         } finally {
             setLoading(false);
-            scrollRef.current?.scrollToEnd({ animated: true });
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
         }
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-[#F8F9FA]">
-            <View className="px-5 py-4 bg-white">
-                <Text className="text-3xl font-extrabold text-primary text-center">המאמן האישי</Text>
+        <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+            {/* Header */}
+            <View
+                style={{
+                    paddingHorizontal: 20,
+                    paddingVertical: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: C.border,
+                    alignItems: 'center',
+                }}
+            >
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
+                    <View
+                        style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: 12,
+                            backgroundColor: `${C.maroon}20`,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: `${C.maroon}35`,
+                        }}
+                    >
+                        <Text style={{ fontSize: 18 }}>🥑</Text>
+                    </View>
+                    <Text style={{ color: C.text, fontSize: 18, fontFamily: 'Assistant_700Bold' }}>
+                        המאמן האישי
+                    </Text>
+                </View>
             </View>
 
-            <ScrollView 
+            {/* Messages */}
+            <ScrollView
                 ref={scrollRef}
-                className="flex-1 px-5 py-4" 
-                contentContainerStyle={{ gap: 16, paddingBottom: 20 }}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 8 }}
                 onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
                 showsVerticalScrollIndicator={false}
             >
                 {messages.map((msg, idx) => (
-                    <View 
-                        key={idx} 
-                        className={`px-5 py-4 rounded-3xl max-w-[85%] ${
-                            msg.role === 'user' 
-                                ? 'bg-primary self-start' 
-                                : 'bg-white self-end'
-                        }`}
-                        style={
-                            msg.role === 'assistant'
-                                ? {
-                                      shadowColor: "#000",
-                                      shadowOffset: { width: 0, height: 2 },
-                                      shadowOpacity: 0.06,
-                                      shadowRadius: 8,
-                                      elevation: 2,
-                                  }
-                                : {}
-                        }
-                    >
-                        <Text className={`${msg.role === 'user' ? 'text-white font-semibold' : 'text-foreground font-medium'} text-right leading-6`}>
-                            {msg.text}
-                        </Text>
-                    </View>
-                ))}
-                {loading && (
-                    <View 
-                        className="bg-white self-end px-5 py-4 rounded-3xl max-w-[85%]"
+                    <View
+                        key={idx}
                         style={{
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.06,
-                            shadowRadius: 8,
-                            elevation: 2,
+                            alignSelf: msg.role === 'user' ? 'flex-start' : 'flex-end',
+                            maxWidth: '82%',
                         }}
                     >
-                        <Text className="text-gray-400 font-semibold text-right">מקליד...</Text>
+                        <View
+                            style={{
+                                paddingHorizontal: 18,
+                                paddingVertical: 13,
+                                borderRadius: 20,
+                                borderBottomLeftRadius: msg.role === 'user' ? 6 : 20,
+                                borderBottomRightRadius: msg.role === 'assistant' ? 6 : 20,
+                                backgroundColor: msg.role === 'user' ? C.maroon : C.card,
+                                borderWidth: msg.role === 'assistant' ? 1 : 0,
+                                borderColor: C.border,
+                                shadowColor: msg.role === 'user' ? C.maroon : '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: msg.role === 'user' ? 0.3 : 0.15,
+                                shadowRadius: 8,
+                                elevation: 3,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: msg.role === 'user' ? '#fff' : C.text,
+                                    fontSize: 15,
+                                    fontFamily: 'Assistant_400Regular',
+                                    textAlign: 'right',
+                                    lineHeight: 24,
+                                }}
+                            >
+                                {msg.text}
+                            </Text>
+                        </View>
+                    </View>
+                ))}
+
+                {loading && (
+                    <View style={{ alignSelf: 'flex-end', maxWidth: '82%' }}>
+                        <View
+                            style={{
+                                paddingHorizontal: 18,
+                                paddingVertical: 14,
+                                borderRadius: 20,
+                                borderBottomRightRadius: 6,
+                                backgroundColor: C.card,
+                                borderWidth: 1,
+                                borderColor: C.border,
+                            }}
+                        >
+                            <Text style={{ color: C.textDim, fontSize: 20, letterSpacing: 4 }}>
+                                •••
+                            </Text>
+                        </View>
                     </View>
                 )}
             </ScrollView>
 
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={100}>
-                <View className="px-5 py-4 flex-row-reverse gap-3 bg-white border-t border-gray-100">
-                    <Input
-                        className="flex-1"
+            {/* Input bar */}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={0}
+            >
+                <View
+                    style={{
+                        flexDirection: 'row-reverse',
+                        alignItems: 'center',
+                        gap: 10,
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        paddingBottom: 20,
+                        borderTopWidth: 1,
+                        borderTopColor: C.border,
+                        backgroundColor: C.bg,
+                    }}
+                >
+                    <TextInput
+                        style={{
+                            flex: 1,
+                            height: 48,
+                            backgroundColor: C.card2,
+                            borderRadius: 16,
+                            paddingHorizontal: 16,
+                            color: C.text,
+                            fontSize: 15,
+                            fontFamily: 'Assistant_400Regular',
+                            textAlign: 'right',
+                            borderWidth: 1,
+                            borderColor: C.border,
+                        }}
                         placeholder="כתוב הודעה..."
+                        placeholderTextColor={C.textDim}
                         value={input}
                         onChangeText={setInput}
                         onSubmitEditing={handleSend}
-                        textAlign="right"
+                        returnKeyType="send"
+                        multiline={false}
                     />
-                    <Button 
-                        label={loading ? "..." : "שלח"} 
-                        className="w-24" 
+                    <TouchableOpacity
                         onPress={handleSend}
-                        disabled={loading}
-                    />
+                        disabled={loading || !input.trim()}
+                        activeOpacity={0.8}
+                        style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 16,
+                            backgroundColor: input.trim() && !loading ? C.maroon : C.card2,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: input.trim() && !loading ? C.maroon : C.border,
+                            shadowColor: C.maroon,
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: input.trim() && !loading ? 0.4 : 0,
+                            shadowRadius: 10,
+                        }}
+                    >
+                        <Send size={18} color={input.trim() && !loading ? '#fff' : C.textDim} />
+                    </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
         </SafeAreaView>

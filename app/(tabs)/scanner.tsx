@@ -2,13 +2,84 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRef, useState } from 'react';
 import { View, TouchableOpacity, Modal, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { Text } from '../../components/ui/Text';
-import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { analyzeImage, FoodAnalysis } from '../../services/ai';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMealsStore } from '../../store/mealsStore';
 import { useRouter } from 'expo-router';
-import { Camera, X } from 'lucide-react-native';
+import { Camera, X, Plus } from 'lucide-react-native';
+
+const C = {
+    bg: "#0A0A0C",
+    card: "#111113",
+    card2: "#18181B",
+    border: "#28282C",
+    maroon: "#800020",
+    text: "#F5F5F7",
+    textDim: "#8E8E93",
+    green: "#10b981",
+    amber: "#f59e0b",
+    red: "#ef4444",
+    blue: "#3b82f6",
+    orange: "#F97316",
+} as const;
+
+function scoreColor(s: number) {
+    if (s >= 8) return C.green;
+    if (s >= 5) return C.amber;
+    return C.red;
+}
+
+function scoreLabel(s: number) {
+    if (s >= 8) return "מעולה לקיטו! 🔥";
+    if (s >= 5) return "בסדר, שים לב לכמות";
+    return "לא מומלץ לקיטו";
+}
+
+function ScanCorner({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
+    const W = 32;
+    const T = 3;
+    const isTop = position.startsWith('t');
+    const isLeft = position.endsWith('l');
+
+    return (
+        <View
+            style={{
+                position: 'absolute',
+                width: W,
+                height: W,
+                ...(isTop ? { top: 0 } : { bottom: 0 }),
+                ...(isLeft ? { left: 0 } : { right: 0 }),
+            }}
+        >
+            <View
+                style={{
+                    position: 'absolute',
+                    height: T,
+                    width: W,
+                    backgroundColor: C.maroon,
+                    ...(isTop ? { top: 0 } : { bottom: 0 }),
+                    shadowColor: C.maroon,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.9,
+                    shadowRadius: 8,
+                }}
+            />
+            <View
+                style={{
+                    position: 'absolute',
+                    width: T,
+                    height: W,
+                    backgroundColor: C.maroon,
+                    ...(isLeft ? { left: 0 } : { right: 0 }),
+                    shadowColor: C.maroon,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.9,
+                    shadowRadius: 8,
+                }}
+            />
+        </View>
+    );
+}
 
 export default function ScannerScreen() {
     const cameraRef = useRef<CameraView>(null);
@@ -19,37 +90,70 @@ export default function ScannerScreen() {
     const router = useRouter();
 
     if (!permission) {
-        return <View className="flex-1 bg-background" />;
+        return <View style={{ flex: 1, backgroundColor: C.bg }} />;
     }
 
     if (!permission.granted) {
         return (
-            <SafeAreaView className="flex-1 justify-center items-center p-6 bg-[#F8F9FA]">
-                <View className="w-28 h-28 rounded-3xl bg-[#800020]/10 items-center justify-center mb-6">
-                    <Camera size={64} color="#800020" strokeWidth={2} />
+            <SafeAreaView style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+                <View
+                    style={{
+                        width: 100,
+                        height: 100,
+                        borderRadius: 28,
+                        backgroundColor: `${C.maroon}18`,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 28,
+                        borderWidth: 1,
+                        borderColor: `${C.maroon}30`,
+                        shadowColor: C.maroon,
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 20,
+                    }}
+                >
+                    <Camera size={48} color={C.maroon} strokeWidth={1.5} />
                 </View>
-                <Text className="text-center mb-2 text-2xl font-extrabold">נדרשת הרשאת מצלמה</Text>
-                <Text className="text-center mb-8 text-base font-semibold text-gray-400">אנו צריכים אישור למצלמה כדי לסרוק את האוכל</Text>
-                <Button label="אפשר גישה למצלמה" onPress={requestPermission} />
+                <Text style={{ color: C.text, fontSize: 22, fontFamily: 'Assistant_700Bold', textAlign: 'center', marginBottom: 12 }}>
+                    נדרשת הרשאת מצלמה
+                </Text>
+                <Text style={{ color: C.textDim, fontSize: 14, textAlign: 'center', fontFamily: 'Assistant_400Regular', lineHeight: 22, marginBottom: 36 }}>
+                    אנו צריכים אישור למצלמה כדי לסרוק את האוכל ולנתח את הערכים התזונתיים
+                </Text>
+                <TouchableOpacity
+                    onPress={requestPermission}
+                    activeOpacity={0.8}
+                    style={{
+                        backgroundColor: C.maroon,
+                        paddingHorizontal: 40,
+                        paddingVertical: 16,
+                        borderRadius: 20,
+                        shadowColor: C.maroon,
+                        shadowOffset: { width: 0, height: 6 },
+                        shadowOpacity: 0.4,
+                        shadowRadius: 16,
+                        elevation: 8,
+                    }}
+                >
+                    <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Assistant_700Bold' }}>
+                        אפשר גישה למצלמה
+                    </Text>
+                </TouchableOpacity>
             </SafeAreaView>
         );
     }
 
     const handleScan = async () => {
         if (!cameraRef.current) return;
-
         try {
             setAnalyzing(true);
-            const photo = await cameraRef.current.takePictureAsync({
-                base64: true,
-                quality: 0.5,
-            });
-
+            const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
             if (photo?.base64) {
                 const data = await analyzeImage(photo.base64);
                 setResult(data);
             }
-        } catch (e) {
+        } catch {
             Alert.alert("שגיאה", "לא הצלחנו לנתח את התמונה. נסה שוב.");
         } finally {
             setAnalyzing(false);
@@ -68,133 +172,282 @@ export default function ScannerScreen() {
             });
             setResult(null);
             Alert.alert("נוסף!", `${result.name} נוסף ליומן שלך`, [
-                { text: "מעולה", onPress: () => router.push("/(tabs)") }
+                { text: "מעולה", onPress: () => router.push("/(tabs)") },
             ]);
         }
     };
 
-    const getScoreColor = (score: number) => {
-        if (score >= 8) return "bg-green-500";
-        if (score >= 5) return "bg-yellow-500";
-        return "bg-red-500";
-    };
-
-    const getScoreText = (score: number) => {
-        if (score >= 8) return "מעולה לקיטו! 🔥";
-        if (score >= 5) return "בסדר, אבל שים לב לכמות";
-        return "לא מומלץ לקיטו";
-    };
-
     return (
-        <View className="flex-1 bg-black">
-            <CameraView
-                ref={cameraRef}
-                style={{ flex: 1 }}
-                facing="back"
-            >
-                <SafeAreaView className="flex-1 justify-between p-6">
-                    <Text className="text-white text-center text-xl font-extrabold bg-black/60 px-6 py-4 rounded-3xl self-center">
-                        צלם את המנה שלך
-                    </Text>
-                    <View className="items-center mb-10">
-                        <TouchableOpacity
-                            onPress={handleScan}
-                            className="w-24 h-24 bg-white rounded-full border-4 border-primary items-center justify-center"
-                            activeOpacity={0.8}
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back">
+                <SafeAreaView style={{ flex: 1, justifyContent: 'space-between' }}>
+                    {/* Top label */}
+                    <View style={{ alignItems: 'center', paddingTop: 16 }}>
+                        <View
                             style={{
-                                shadowColor: "#000",
-                                shadowOffset: { width: 0, height: 4 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 12,
-                                elevation: 8,
+                                backgroundColor: 'rgba(0,0,0,0.65)',
+                                paddingHorizontal: 24,
+                                paddingVertical: 12,
+                                borderRadius: 20,
+                                borderWidth: 1,
+                                borderColor: 'rgba(255,255,255,0.1)',
                             }}
                         >
-                            <View className="w-20 h-20 bg-primary rounded-full" />
+                            <Text style={{ color: '#fff', fontSize: 15, fontFamily: 'Assistant_700Bold' }}>
+                                כוון את המצלמה לאוכל
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Scan frame */}
+                    <View style={{ alignItems: 'center' }}>
+                        <View style={{ width: 220, height: 220, position: 'relative' }}>
+                            <ScanCorner position="tl" />
+                            <ScanCorner position="tr" />
+                            <ScanCorner position="bl" />
+                            <ScanCorner position="br" />
+                        </View>
+                    </View>
+
+                    {/* Shutter */}
+                    <View style={{ alignItems: 'center', paddingBottom: 48 }}>
+                        <TouchableOpacity
+                            onPress={handleScan}
+                            activeOpacity={0.8}
+                            style={{
+                                width: 80,
+                                height: 80,
+                                borderRadius: 40,
+                                borderWidth: 4,
+                                borderColor: 'rgba(255,255,255,0.7)',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 30,
+                                    backgroundColor: '#fff',
+                                    shadowColor: '#fff',
+                                    shadowOffset: { width: 0, height: 0 },
+                                    shadowOpacity: 0.4,
+                                    shadowRadius: 10,
+                                }}
+                            />
                         </TouchableOpacity>
-                        <Text className="text-white mt-4 text-base font-bold">לחץ לצילום</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 14, fontFamily: 'Assistant_400Regular' }}>
+                            לחץ לצילום
+                        </Text>
                     </View>
                 </SafeAreaView>
             </CameraView>
 
+            {/* Analyzing overlay */}
             <Modal visible={analyzing} transparent animationType="fade">
-                <View className="flex-1 bg-black/80 justify-center items-center px-8">
-                    <View 
-                        className="bg-white rounded-3xl p-8 items-center w-full max-w-xs"
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 }}>
+                    <View
                         style={{
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 16,
-                            elevation: 10,
+                            backgroundColor: C.card,
+                            borderRadius: 28,
+                            padding: 36,
+                            alignItems: 'center',
+                            width: '100%',
+                            borderWidth: 1,
+                            borderColor: C.border,
                         }}
                     >
-                        <ActivityIndicator size="large" color="#800020" />
-                        <Text className="mt-5 font-extrabold text-xl text-center">מנתח את המנה...</Text>
-                        <Text className="text-gray-400 mt-2 text-sm font-semibold text-center">זה יכול לקחת כמה שניות</Text>
+                        <ActivityIndicator size="large" color={C.maroon} />
+                        <Text style={{ color: C.text, fontSize: 18, fontFamily: 'Assistant_700Bold', marginTop: 20, textAlign: 'center' }}>
+                            מנתח את המנה...
+                        </Text>
+                        <Text style={{ color: C.textDim, fontSize: 13, fontFamily: 'Assistant_400Regular', marginTop: 8, textAlign: 'center' }}>
+                            זה יכול לקחת כמה שניות
+                        </Text>
                     </View>
                 </View>
             </Modal>
 
+            {/* Results modal */}
             <Modal visible={!!result} animationType="slide" presentationStyle="pageSheet">
                 {result && (
-                    <SafeAreaView className="flex-1 bg-[#F8F9FA]">
-                        <View className="flex-row-reverse justify-between items-center px-5 py-4">
-                            <Text className="text-2xl font-extrabold">תוצאות הסריקה</Text>
-                            <TouchableOpacity 
-                                onPress={() => setResult(null)} 
-                                className="w-12 h-12 items-center justify-center rounded-2xl bg-gray-100"
-                                activeOpacity={0.7}
+                    <View style={{ flex: 1, backgroundColor: C.bg }}>
+                        <SafeAreaView style={{ flex: 1 }}>
+                            {/* Header */}
+                            <View
+                                style={{
+                                    flexDirection: 'row-reverse',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    paddingHorizontal: 20,
+                                    paddingVertical: 16,
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: C.border,
+                                }}
                             >
-                                <X size={24} color="#666" strokeWidth={2.5} />
-                            </TouchableOpacity>
-                        </View>
-                        
-                        <ScrollView 
-                            className="flex-1 px-5"
-                            contentContainerStyle={{ paddingBottom: 40, paddingTop: 8 }}
-                            showsVerticalScrollIndicator={false}
-                        >
-                            {/* Keto Score - Big */}
-                            <Card className={`p-8 mb-5 ${getScoreColor(result.ketoScore)}`}>
-                                <View className="items-center">
-                                    <Text className="text-white text-base font-extrabold mb-3">ציון קיטו</Text>
-                                    <Text className="text-white text-7xl font-extrabold">{result.ketoScore}</Text>
-                                    <Text className="text-white/95 mt-4 text-base font-bold">{getScoreText(result.ketoScore)}</Text>
-                                </View>
-                            </Card>
+                                <Text style={{ color: C.text, fontSize: 20, fontFamily: 'Assistant_700Bold' }}>
+                                    תוצאות הסריקה
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => setResult(null)}
+                                    activeOpacity={0.7}
+                                    style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 12,
+                                        backgroundColor: C.card2,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderWidth: 1,
+                                        borderColor: C.border,
+                                    }}
+                                >
+                                    <X size={20} color={C.textDim} strokeWidth={2} />
+                                </TouchableOpacity>
+                            </View>
 
-                            {/* Food Info */}
-                            <Card className="p-6 mb-5">
-                                <Text className="text-3xl font-extrabold mb-2 text-right leading-9">{result.name}</Text>
-                                <Text className="text-gray-500 font-semibold mb-5 text-right text-base leading-6">{result.explanation}</Text>
-
-                                <View className="flex-row-reverse justify-between py-4 border-t border-gray-100">
-                                    <Text className="font-extrabold text-base">קלוריות</Text>
-                                    <Text className="text-xl font-extrabold text-primary">{result.calories}</Text>
-                                </View>
-
-                                <View className="flex-row-reverse justify-between py-4 border-t border-gray-100">
-                                    <Text className="font-extrabold text-base">פחמימות</Text>
-                                    <Text className={`text-xl font-extrabold ${result.carbs > 10 ? "text-red-500" : "text-green-500"}`}>
-                                        {result.carbs}g
+                            <ScrollView
+                                contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {/* Score card */}
+                                <View
+                                    style={{
+                                        backgroundColor: C.card,
+                                        borderRadius: 28,
+                                        padding: 28,
+                                        alignItems: 'center',
+                                        marginBottom: 16,
+                                        borderWidth: 1,
+                                        borderColor: `${scoreColor(result.ketoScore)}30`,
+                                        shadowColor: scoreColor(result.ketoScore),
+                                        shadowOffset: { width: 0, height: 0 },
+                                        shadowOpacity: 0.2,
+                                        shadowRadius: 20,
+                                    }}
+                                >
+                                    <Text style={{ color: C.textDim, fontSize: 13, fontFamily: 'Assistant_400Regular', marginBottom: 16 }}>
+                                        ציון קיטו
+                                    </Text>
+                                    <View
+                                        style={{
+                                            width: 120,
+                                            height: 120,
+                                            borderRadius: 60,
+                                            borderWidth: 5,
+                                            borderColor: scoreColor(result.ketoScore),
+                                            backgroundColor: `${scoreColor(result.ketoScore)}12`,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            shadowColor: scoreColor(result.ketoScore),
+                                            shadowOffset: { width: 0, height: 0 },
+                                            shadowOpacity: 0.45,
+                                            shadowRadius: 20,
+                                            marginBottom: 16,
+                                        }}
+                                    >
+                                        <Text style={{ color: scoreColor(result.ketoScore), fontSize: 48, fontFamily: 'Assistant_700Bold', lineHeight: 54 }}>
+                                            {result.ketoScore}
+                                        </Text>
+                                        <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular' }}>/ 10</Text>
+                                    </View>
+                                    <Text style={{ color: scoreColor(result.ketoScore), fontSize: 15, fontFamily: 'Assistant_700Bold' }}>
+                                        {scoreLabel(result.ketoScore)}
                                     </Text>
                                 </View>
 
-                                <View className="flex-row-reverse justify-between py-4 border-t border-gray-100">
-                                    <Text className="font-extrabold text-base">שומן</Text>
-                                    <Text className="text-xl font-extrabold">{result.fat}g</Text>
+                                {/* Food info */}
+                                <View
+                                    style={{
+                                        backgroundColor: C.card,
+                                        borderRadius: 28,
+                                        padding: 24,
+                                        marginBottom: 16,
+                                        borderWidth: 1,
+                                        borderColor: C.border,
+                                    }}
+                                >
+                                    <Text style={{ color: C.text, fontSize: 24, fontFamily: 'Assistant_700Bold', textAlign: 'right', marginBottom: 10 }}>
+                                        {result.name}
+                                    </Text>
+                                    <Text style={{ color: C.textDim, fontSize: 14, fontFamily: 'Assistant_400Regular', textAlign: 'right', lineHeight: 22, marginBottom: 20 }}>
+                                        {result.explanation}
+                                    </Text>
+
+                                    {[
+                                        { label: 'קלוריות', value: `${result.calories}`, color: C.orange },
+                                        { label: 'פחמימות', value: `${result.carbs}g`, color: result.carbs > 10 ? C.red : C.green },
+                                        { label: 'שומן', value: `${result.fat}g`, color: C.green },
+                                        { label: 'חלבון', value: `${result.protein}g`, color: C.blue },
+                                    ].map((row, i) => (
+                                        <View
+                                            key={i}
+                                            style={{
+                                                flexDirection: 'row-reverse',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                paddingVertical: 14,
+                                                borderTopWidth: i === 0 ? 1 : 0,
+                                                borderBottomWidth: 1,
+                                                borderColor: C.border,
+                                            }}
+                                        >
+                                            <Text style={{ color: C.textDim, fontSize: 15, fontFamily: 'Assistant_400Regular' }}>
+                                                {row.label}
+                                            </Text>
+                                            <Text style={{ color: row.color, fontSize: 18, fontFamily: 'Assistant_700Bold' }}>
+                                                {row.value}
+                                            </Text>
+                                        </View>
+                                    ))}
                                 </View>
 
-                                <View className="flex-row-reverse justify-between py-4 border-t border-gray-100">
-                                    <Text className="font-extrabold text-base">חלבון</Text>
-                                    <Text className="text-xl font-extrabold">{result.protein}g</Text>
-                                </View>
-                            </Card>
+                                {/* Actions */}
+                                <TouchableOpacity
+                                    onPress={handleAddMeal}
+                                    activeOpacity={0.8}
+                                    style={{
+                                        backgroundColor: C.maroon,
+                                        borderRadius: 20,
+                                        paddingVertical: 18,
+                                        alignItems: 'center',
+                                        marginBottom: 12,
+                                        shadowColor: C.maroon,
+                                        shadowOffset: { width: 0, height: 6 },
+                                        shadowOpacity: 0.4,
+                                        shadowRadius: 14,
+                                        elevation: 8,
+                                        flexDirection: 'row-reverse',
+                                        justifyContent: 'center',
+                                        gap: 10,
+                                    }}
+                                >
+                                    <Plus size={20} color="#fff" strokeWidth={2.5} />
+                                    <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Assistant_700Bold' }}>
+                                        הוסף ליומן
+                                    </Text>
+                                </TouchableOpacity>
 
-                            <Button label="הוסף ליומן" onPress={handleAddMeal} className="mb-4" />
-                            <Button label="צלם שוב" variant="outline" onPress={() => setResult(null)} />
-                        </ScrollView>
-                    </SafeAreaView>
+                                <TouchableOpacity
+                                    onPress={() => setResult(null)}
+                                    activeOpacity={0.7}
+                                    style={{
+                                        backgroundColor: C.card,
+                                        borderRadius: 20,
+                                        paddingVertical: 18,
+                                        alignItems: 'center',
+                                        borderWidth: 1,
+                                        borderColor: C.border,
+                                    }}
+                                >
+                                    <Text style={{ color: C.textDim, fontSize: 16, fontFamily: 'Assistant_700Bold' }}>
+                                        צלם שוב
+                                    </Text>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        </SafeAreaView>
+                    </View>
                 )}
             </Modal>
         </View>
