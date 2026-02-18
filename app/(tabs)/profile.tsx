@@ -1,16 +1,32 @@
-import { View, Switch, ScrollView } from "react-native";
+import { View, Switch, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "../../components/ui/Text";
 import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import { useUserStore } from "../../store/userStore";
+import { supabase } from "../../lib/supabase";
 import { useState, useEffect } from "react";
 
 export default function ProfileScreen() {
     const profile = useUserStore((state) => state.profile);
     const setProfile = useUserStore((state) => state.setProfile);
     const syncFromSupabase = useUserStore((state) => state.syncFromSupabase);
+    const reset = useUserStore((state) => state.reset);
+
+    async function signOut() {
+        Alert.alert("התנתק", "האם אתה בטוח שברצונך להתנתק?", [
+            { text: "ביטול", style: "cancel" },
+            {
+                text: "התנתק",
+                style: "destructive",
+                onPress: async () => {
+                    await supabase.auth.signOut();
+                    reset();
+                },
+            },
+        ]);
+    }
 
     // Local state for form
     const [form, setForm] = useState(profile);
@@ -114,6 +130,13 @@ export default function ProfileScreen() {
                     </View>
                     <Switch value={false} onValueChange={() => { }} />
                 </Card>
+
+                <Button
+                    label="התנתק"
+                    variant="outline"
+                    onPress={signOut}
+                    className="border-red-300"
+                />
             </ScrollView>
         </SafeAreaView>
     );

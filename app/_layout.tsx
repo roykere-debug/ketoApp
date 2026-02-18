@@ -1,9 +1,11 @@
 import "../global.css";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { useFonts, Assistant_400Regular, Assistant_700Bold } from "@expo-google-fonts/assistant";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
+import { Session } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
 
 // Note: RTL is handled via CSS classes (flex-row-reverse, text-right, etc.)
 // Using I18nManager.forceRTL(true) causes app reload loops
@@ -16,13 +18,32 @@ export default function Layout() {
         Assistant_700Bold,
     });
 
-    useEffect(() => {
-        if (loaded || error) {
-            SplashScreen.hideAsync();
-        }
-    }, [loaded, error]);
+    const [session, setSession] = useState<Session | null | undefined>(undefined);
+    const router = useRouter();
+    const segments = useSegments();
 
-    if (!loaded && !error) {
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+        return () => subscription.unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        if ((!loaded && !error) || session === undefined) return;
+
+        SplashScreen.hideAsync();
+
+        const inTabsGroup = segments[0] === "(tabs)";
+
+        if (session && !inTabsGroup) {
+            router.replace("/(tabs)");
+        } else if (!session && inTabsGroup) {
+            router.replace("/login");
+        }
+    }, [loaded, error, session, segments]);
+
+    if ((!loaded && !error) || session === undefined) {
         return null;
     }
 
@@ -48,9 +69,8 @@ export default function Layout() {
                 <Stack.Screen
                     name="login"
                     options={{
-                        headerShown: true,
-                        title: "התחברות",
-                        presentation: "modal",
+                        headerShown: false,
+                        presentation: "card",
                     }}
                 />
                 <Stack.Screen
