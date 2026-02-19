@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { useUserStore } from "../store/userStore";
 
 // Note: RTL is handled via CSS classes (flex-row-reverse, text-right, etc.)
 // Using I18nManager.forceRTL(true) causes app reload loops
@@ -19,6 +20,7 @@ export default function Layout() {
     });
 
     const [session, setSession] = useState<Session | null | undefined>(undefined);
+    const hasOnboarded = useUserStore((s) => s.hasOnboarded);
     const router = useRouter();
     const segments = useSegments();
 
@@ -35,13 +37,16 @@ export default function Layout() {
         SplashScreen.hideAsync();
 
         const inTabsGroup = segments[0] === "(tabs)";
+        const inOnboarding = segments[0] === "onboarding";
 
-        if (session && !inTabsGroup) {
+        if (session && !hasOnboarded && !inOnboarding) {
+            router.replace("/onboarding");
+        } else if (session && hasOnboarded && !inTabsGroup) {
             router.replace("/(tabs)");
         } else if (!session && inTabsGroup) {
             router.replace("/login");
         }
-    }, [loaded, error, session, segments]);
+    }, [loaded, error, session, segments, hasOnboarded]);
 
     if ((!loaded && !error) || session === undefined) {
         return null;
@@ -67,6 +72,13 @@ export default function Layout() {
                 <Stack.Screen name="index" />
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen
+                    name="onboarding"
+                    options={{
+                        headerShown: false,
+                        gestureEnabled: false,
+                    }}
+                />
+                <Stack.Screen
                     name="login"
                     options={{
                         headerShown: false,
@@ -78,6 +90,18 @@ export default function Layout() {
                     options={{
                         headerShown: true,
                         title: "מה יש במקרר?",
+                    }}
+                />
+                <Stack.Screen
+                    name="settings"
+                    options={{
+                        headerShown: false,
+                    }}
+                />
+                <Stack.Screen
+                    name="history"
+                    options={{
+                        headerShown: false,
                     }}
                 />
             </Stack>

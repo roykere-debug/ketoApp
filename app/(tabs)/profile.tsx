@@ -1,11 +1,13 @@
-import { View, Switch, ScrollView, Alert, TextInput } from "react-native";
+import { View, ScrollView, Alert, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "../../components/ui/Text";
 import { TouchableOpacity } from "react-native";
 import { useUserStore } from "../../store/userStore";
+import { useMealsStore } from "../../store/mealsStore";
 import { supabase } from "../../lib/supabase";
+import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { User, Scale, Activity, LogOut, Save } from "lucide-react-native";
+import { User, Scale, Activity, LogOut, Save, Settings } from "lucide-react-native";
 
 const C = {
     bg: "#0A0A0C",
@@ -89,19 +91,47 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 export default function ProfileScreen() {
+    const router = useRouter();
     const profile = useUserStore((state) => state.profile);
     const setProfile = useUserStore((state) => state.setProfile);
     const syncFromSupabase = useUserStore((state) => state.syncFromSupabase);
     const reset = useUserStore((state) => state.reset);
 
+    const dailyGoals = useMealsStore((state) => state.dailyGoals);
+    const setDailyGoals = useMealsStore((state) => state.setDailyGoals);
+
     const [form, setForm] = useState(profile);
+    const [goalsForm, setGoalsForm] = useState({
+        calories: String(dailyGoals.calories),
+        protein: String(dailyGoals.protein),
+        fat: String(dailyGoals.fat),
+        carbs: String(dailyGoals.carbs),
+    });
 
     useEffect(() => { syncFromSupabase(); }, []);
     useEffect(() => { setForm(profile); }, [profile]);
+    useEffect(() => {
+        setGoalsForm({
+            calories: String(dailyGoals.calories),
+            protein: String(dailyGoals.protein),
+            fat: String(dailyGoals.fat),
+            carbs: String(dailyGoals.carbs),
+        });
+    }, [dailyGoals]);
 
     const handleSave = () => {
         setProfile(form);
         Alert.alert("נשמר!", "הפרופיל עודכן בהצלחה");
+    };
+
+    const handleSaveGoals = () => {
+        setDailyGoals({
+            calories: parseInt(goalsForm.calories) || dailyGoals.calories,
+            protein: parseInt(goalsForm.protein) || dailyGoals.protein,
+            fat: parseInt(goalsForm.fat) || dailyGoals.fat,
+            carbs: parseInt(goalsForm.carbs) || dailyGoals.carbs,
+        });
+        Alert.alert("נשמר!", "היעדים היומיים עודכנו");
     };
 
     async function signOut() {
@@ -261,8 +291,86 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                 </SectionCard>
 
+                {/* Daily Goals */}
+                <SectionCard
+                    title="יעדים יומיים"
+                    icon={<Target size={18} color={C.maroon} />}
+                >
+                    <View style={{ flexDirection: 'row-reverse', gap: 12 }}>
+                        <View style={{ flex: 1 }}>
+                            <FieldRow label="קלוריות">
+                                <DarkInput
+                                    value={goalsForm.calories}
+                                    onChangeText={(t) => setGoalsForm((p) => ({ ...p, calories: t }))}
+                                    placeholder="2000"
+                                    keyboardType="numeric"
+                                />
+                            </FieldRow>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <FieldRow label="פחמימות (g)">
+                                <DarkInput
+                                    value={goalsForm.carbs}
+                                    onChangeText={(t) => setGoalsForm((p) => ({ ...p, carbs: t }))}
+                                    placeholder="25"
+                                    keyboardType="numeric"
+                                />
+                            </FieldRow>
+                        </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row-reverse', gap: 12 }}>
+                        <View style={{ flex: 1 }}>
+                            <FieldRow label="שומן (g)">
+                                <DarkInput
+                                    value={goalsForm.fat}
+                                    onChangeText={(t) => setGoalsForm((p) => ({ ...p, fat: t }))}
+                                    placeholder="150"
+                                    keyboardType="numeric"
+                                />
+                            </FieldRow>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <FieldRow label="חלבון (g)">
+                                <DarkInput
+                                    value={goalsForm.protein}
+                                    onChangeText={(t) => setGoalsForm((p) => ({ ...p, protein: t }))}
+                                    placeholder="100"
+                                    keyboardType="numeric"
+                                />
+                            </FieldRow>
+                        </View>
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={handleSaveGoals}
+                        activeOpacity={0.8}
+                        style={{
+                            backgroundColor: C.maroon,
+                            borderRadius: 16,
+                            paddingVertical: 16,
+                            flexDirection: 'row-reverse',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            shadowColor: C.maroon,
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.35,
+                            shadowRadius: 12,
+                            elevation: 6,
+                        }}
+                    >
+                        <Save size={18} color="#fff" />
+                        <Text style={{ color: '#fff', fontSize: 15, fontFamily: 'Assistant_700Bold' }}>
+                            עדכן יעדים
+                        </Text>
+                    </TouchableOpacity>
+                </SectionCard>
+
                 {/* Apple Health */}
-                <View
+                <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => Alert.alert("בקרוב!", "חיבור ל-Apple Health יהיה זמין בגרסה הבאה.")}
                     style={{
                         backgroundColor: C.card,
                         borderRadius: 24,
@@ -299,13 +407,42 @@ export default function ProfileScreen() {
                             </Text>
                         </View>
                     </View>
-                    <Switch
-                        value={false}
-                        onValueChange={() => {}}
-                        trackColor={{ false: C.card2, true: C.green }}
-                        thumbColor="#fff"
-                    />
-                </View>
+                    <View style={{
+                        backgroundColor: `${C.amber}18`,
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: `${C.amber}25`,
+                    }}>
+                        <Text style={{ color: C.amber, fontSize: 11, fontFamily: 'Assistant_700Bold' }}>
+                            בקרוב
+                        </Text>
+                    </View>
+                </TouchableOpacity>
+
+                {/* Settings */}
+                <TouchableOpacity
+                    onPress={() => router.push("/settings")}
+                    activeOpacity={0.7}
+                    style={{
+                        backgroundColor: C.card,
+                        borderRadius: 24,
+                        paddingVertical: 18,
+                        flexDirection: 'row-reverse',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 10,
+                        borderWidth: 1,
+                        borderColor: C.border,
+                        marginBottom: 12,
+                    }}
+                >
+                    <Settings size={18} color={C.text} />
+                    <Text style={{ color: C.text, fontSize: 15, fontFamily: 'Assistant_700Bold' }}>
+                        הגדרות
+                    </Text>
+                </TouchableOpacity>
 
                 {/* Sign out */}
                 <TouchableOpacity
