@@ -6,13 +6,25 @@ import {
     Platform,
     ScrollView,
     TouchableOpacity,
+    TextInput,
+    ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "../components/ui/Text";
-import { Input } from "../components/ui/Input";
-import { Button } from "../components/ui/Button";
 import { supabase } from "../lib/supabase";
 import { useRouter } from "expo-router";
+import { ChevronRight } from "lucide-react-native";
+
+const C = {
+    bg: "#0A0A0C",
+    card: "#111113",
+    card2: "#18181B",
+    border: "#28282C",
+    maroon: "#800020",
+    text: "#F5F5F7",
+    textDim: "#8E8E93",
+    textDimmer: "#3A3A3C",
+} as const;
 
 type AuthMode = "login" | "signup";
 
@@ -31,7 +43,6 @@ export default function LoginScreen() {
         setLoading(true);
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) Alert.alert("שגיאה", error.message);
-        else router.replace("/(tabs)");
         setLoading(false);
     }
 
@@ -66,83 +77,116 @@ export default function LoginScreen() {
     }
 
     return (
-        <SafeAreaView className="flex-1 bg-white">
+        <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
-                className="flex-1"
+                style={{ flex: 1 }}
             >
                 <ScrollView
                     contentContainerStyle={{ flexGrow: 1 }}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
+                    {/* Back button */}
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        activeOpacity={0.7}
+                        style={{
+                            flexDirection: "row-reverse",
+                            alignItems: "center",
+                            gap: 4,
+                            paddingHorizontal: 20,
+                            paddingTop: 8,
+                        }}
+                    >
+                        <ChevronRight size={20} color={C.textDim} />
+                        <Text style={{ color: C.textDim, fontSize: 14, fontFamily: "Assistant_400Regular" }}>
+                            חזרה
+                        </Text>
+                    </TouchableOpacity>
+
                     {/* Logo / Header */}
-                    <View className="items-center pt-14 pb-10 px-6">
+                    <View style={{ alignItems: "center", paddingTop: 40, paddingBottom: 40, paddingHorizontal: 24 }}>
                         <View
-                            className="w-20 h-20 bg-primary rounded-3xl items-center justify-center mb-5"
                             style={{
-                                shadowColor: "#800020",
-                                shadowOffset: { width: 0, height: 8 },
-                                shadowOpacity: 0.3,
-                                shadowRadius: 16,
+                                width: 80,
+                                height: 80,
+                                borderRadius: 24,
+                                backgroundColor: `${C.maroon}20`,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                marginBottom: 20,
+                                borderWidth: 1,
+                                borderColor: `${C.maroon}35`,
+                                shadowColor: C.maroon,
+                                shadowOffset: { width: 0, height: 0 },
+                                shadowOpacity: 0.4,
+                                shadowRadius: 24,
                                 elevation: 10,
                             }}
                         >
-                            <Text className="text-white text-4xl font-bold">K</Text>
+                            <Text style={{ color: C.maroon, fontSize: 38, fontFamily: "Assistant_700Bold", lineHeight: 46 }}>
+                                K
+                            </Text>
                         </View>
-                        <Text className="text-3xl font-bold text-primary mb-1">MyKeto</Text>
-                        <Text className="text-gray-400 text-center text-sm font-semibold">
+                        <Text style={{ color: C.text, fontSize: 30, fontFamily: "Assistant_700Bold", marginBottom: 6 }}>
+                            MyKeto
+                        </Text>
+                        <Text style={{ color: C.textDim, fontSize: 14, fontFamily: "Assistant_400Regular", textAlign: "center" }}>
                             הדרך החכמה לתזונה קטוגנית
                         </Text>
                     </View>
 
                     {/* Segmented Control */}
-                    <View className="mx-6 mb-8">
-                        <View className="flex-row bg-gray-100 rounded-2xl p-1">
+                    <View style={{ marginHorizontal: 24, marginBottom: 32 }}>
+                        <View
+                            style={{
+                                flexDirection: "row",
+                                backgroundColor: C.card,
+                                borderRadius: 16,
+                                padding: 4,
+                                borderWidth: 1,
+                                borderColor: C.border,
+                            }}
+                        >
                             <TouchableOpacity
-                                className={`flex-1 py-3 rounded-xl items-center ${mode === "login" ? "bg-white" : ""}`}
-                                style={
-                                    mode === "login"
-                                        ? {
-                                              shadowColor: "#000",
-                                              shadowOffset: { width: 0, height: 2 },
-                                              shadowOpacity: 0.08,
-                                              shadowRadius: 8,
-                                              elevation: 3,
-                                          }
-                                        : {}
-                                }
                                 onPress={() => setMode("login")}
                                 activeOpacity={0.7}
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 12,
+                                    borderRadius: 12,
+                                    alignItems: "center",
+                                    backgroundColor: mode === "login" ? C.maroon : "transparent",
+                                }}
                             >
                                 <Text
-                                    className={`font-bold text-base ${
-                                        mode === "login" ? "text-primary" : "text-gray-400"
-                                    }`}
+                                    style={{
+                                        fontFamily: "Assistant_700Bold",
+                                        fontSize: 15,
+                                        color: mode === "login" ? "#fff" : C.textDim,
+                                    }}
                                 >
                                     התחברות
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                className={`flex-1 py-3 rounded-xl items-center ${mode === "signup" ? "bg-white" : ""}`}
-                                style={
-                                    mode === "signup"
-                                        ? {
-                                              shadowColor: "#000",
-                                              shadowOffset: { width: 0, height: 2 },
-                                              shadowOpacity: 0.08,
-                                              shadowRadius: 8,
-                                              elevation: 3,
-                                          }
-                                        : {}
-                                }
                                 onPress={() => setMode("signup")}
                                 activeOpacity={0.7}
+                                style={{
+                                    flex: 1,
+                                    paddingVertical: 12,
+                                    borderRadius: 12,
+                                    alignItems: "center",
+                                    backgroundColor: mode === "signup" ? C.maroon : "transparent",
+                                }}
                             >
                                 <Text
-                                    className={`font-bold text-base ${
-                                        mode === "signup" ? "text-primary" : "text-gray-400"
-                                    }`}
+                                    style={{
+                                        fontFamily: "Assistant_700Bold",
+                                        fontSize: 15,
+                                        color: mode === "signup" ? "#fff" : C.textDim,
+                                    }}
                                 >
                                     הרשמה
                                 </Text>
@@ -151,51 +195,96 @@ export default function LoginScreen() {
                     </View>
 
                     {/* Form */}
-                    <View className="mx-6 gap-4">
+                    <View style={{ marginHorizontal: 24, gap: 18 }}>
                         <View>
-                            <Text className="mb-2 text-sm font-bold text-right text-gray-600">
+                            <Text style={{ color: C.textDim, fontSize: 12, fontFamily: "Assistant_400Regular", textAlign: "right", marginBottom: 8 }}>
                                 כתובת אימייל
                             </Text>
-                            <Input
+                            <TextInput
                                 onChangeText={setEmail}
                                 value={email}
                                 placeholder="email@example.com"
+                                placeholderTextColor={C.textDimmer}
                                 autoCapitalize="none"
                                 keyboardType="email-address"
                                 autoComplete="email"
                                 textAlign="right"
+                                style={{
+                                    height: 56,
+                                    backgroundColor: C.card2,
+                                    borderRadius: 16,
+                                    paddingHorizontal: 18,
+                                    color: C.text,
+                                    fontSize: 16,
+                                    fontFamily: "Assistant_400Regular",
+                                    borderWidth: 1,
+                                    borderColor: C.border,
+                                }}
                             />
                         </View>
 
                         <View>
-                            <Text className="mb-2 text-sm font-bold text-right text-gray-600">
+                            <Text style={{ color: C.textDim, fontSize: 12, fontFamily: "Assistant_400Regular", textAlign: "right", marginBottom: 8 }}>
                                 סיסמה
                             </Text>
-                            <Input
+                            <TextInput
                                 onChangeText={setPassword}
                                 value={password}
                                 secureTextEntry
                                 placeholder={mode === "signup" ? "לפחות 6 תווים" : "הסיסמה שלך"}
+                                placeholderTextColor={C.textDimmer}
                                 autoCapitalize="none"
                                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
                                 textAlign="right"
+                                style={{
+                                    height: 56,
+                                    backgroundColor: C.card2,
+                                    borderRadius: 16,
+                                    paddingHorizontal: 18,
+                                    color: C.text,
+                                    fontSize: 16,
+                                    fontFamily: "Assistant_400Regular",
+                                    borderWidth: 1,
+                                    borderColor: C.border,
+                                }}
                             />
                         </View>
 
-                        <Button
-                            label={loading ? "טוען..." : mode === "login" ? "התחבר" : "צור חשבון"}
+                        <TouchableOpacity
                             onPress={mode === "login" ? signInWithEmail : signUpWithEmail}
                             disabled={loading}
-                            className="mt-2"
-                        />
+                            activeOpacity={0.85}
+                            style={{
+                                backgroundColor: loading ? C.card2 : C.maroon,
+                                borderRadius: 18,
+                                paddingVertical: 18,
+                                alignItems: "center",
+                                marginTop: 8,
+                                shadowColor: C.maroon,
+                                shadowOffset: { width: 0, height: 6 },
+                                shadowOpacity: loading ? 0 : 0.4,
+                                shadowRadius: 16,
+                                elevation: loading ? 0 : 8,
+                            }}
+                        >
+                            {loading ? (
+                                <ActivityIndicator size="small" color={C.textDim} />
+                            ) : (
+                                <Text style={{ color: "#fff", fontSize: 17, fontFamily: "Assistant_700Bold" }}>
+                                    {mode === "login" ? "התחבר" : "צור חשבון"}
+                                </Text>
+                            )}
+                        </TouchableOpacity>
 
                         {mode === "login" && (
                             <TouchableOpacity
                                 onPress={resetPassword}
-                                className="items-center py-3"
                                 activeOpacity={0.7}
+                                style={{ alignItems: "center", paddingVertical: 12 }}
                             >
-                                <Text className="text-primary text-sm font-bold">שכחתי סיסמה</Text>
+                                <Text style={{ color: C.maroon, fontSize: 14, fontFamily: "Assistant_700Bold" }}>
+                                    שכחתי סיסמה
+                                </Text>
                             </TouchableOpacity>
                         )}
                     </View>

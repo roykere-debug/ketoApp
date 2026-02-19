@@ -25,6 +25,23 @@ export default function Layout() {
     const segments = useSegments();
 
     useEffect(() => {
+        (async () => {
+            try {
+                const { data, error } = await supabase.auth.getSession();
+                if (error?.message?.includes('Refresh Token')) {
+                    await supabase.auth.signOut({ scope: 'local' });
+                    setSession(null);
+                    return;
+                }
+                setSession(data.session ?? null);
+            } catch (err: unknown) {
+                const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: unknown }).message) : '';
+                if (msg.includes('Refresh Token') || msg.includes('refresh_token')) {
+                    await supabase.auth.signOut({ scope: 'local' });
+                }
+                setSession(null);
+            }
+        })();
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
         });
@@ -38,12 +55,13 @@ export default function Layout() {
 
         const inTabsGroup = segments[0] === "(tabs)";
         const inOnboarding = segments[0] === "onboarding";
+        const inAppScreen = ["recipes", "settings", "history"].includes(segments[0] as string);
 
         if (session && !hasOnboarded && !inOnboarding) {
             router.replace("/onboarding");
-        } else if (session && hasOnboarded && !inTabsGroup) {
+        } else if (session && hasOnboarded && !inTabsGroup && !inAppScreen) {
             router.replace("/(tabs)");
-        } else if (!session && inTabsGroup) {
+        } else if (!session && (inTabsGroup || inAppScreen)) {
             router.replace("/login");
         }
     }, [loaded, error, session, segments, hasOnboarded]);
@@ -88,8 +106,7 @@ export default function Layout() {
                 <Stack.Screen
                     name="recipes"
                     options={{
-                        headerShown: true,
-                        title: "מה יש במקרר?",
+                        headerShown: false,
                     }}
                 />
                 <Stack.Screen

@@ -17,16 +17,16 @@ export function Button({
     ...props
 }: ButtonProps) {
 
-    const baseStyles = "flex-row items-center justify-center rounded-2xl";
+    const baseStyles = "flex-row items-center justify-center rounded-xl";
     const variants = {
         default: "bg-primary",
         outline: "border-2 border-primary bg-transparent",
         ghost: "bg-transparent",
     };
     const sizes = {
-        default: "h-14 px-7 py-4",
+        default: "h-14 px-6 py-4",
         sm: "h-10 px-4 py-2",
-        lg: "h-16 px-9 py-5",
+        lg: "h-16 px-8 py-4",
     };
 
     const textStyles = {

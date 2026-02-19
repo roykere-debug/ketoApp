@@ -2,12 +2,13 @@ import { View, ScrollView, Alert, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "../../components/ui/Text";
 import { TouchableOpacity } from "react-native";
-import { useUserStore } from "../../store/userStore";
+import { useUserStore, KetoGoal, GoalPace } from "../../store/userStore";
 import { useMealsStore } from "../../store/mealsStore";
+import { calculateKetoGoals } from "../../lib/ketoCalculator";
 import { supabase } from "../../lib/supabase";
 import { useRouter } from "expo-router";
-import { useState, useEffect } from "react";
-import { User, Scale, Activity, LogOut, Save, Settings } from "lucide-react-native";
+import { useState, useEffect, useMemo } from "react";
+import { User, Scale, Activity, LogOut, Save, Settings, Target } from "lucide-react-native";
 
 const C = {
     bg: "#0A0A0C",
@@ -21,6 +22,64 @@ const C = {
     green: "#10b981",
     red: "#ef4444",
 } as const;
+
+const GOAL_OPTIONS: { value: KetoGoal; label: string; emoji: string }[] = [
+    { value: "lose_weight", label: "לרדת במשקל", emoji: "⬇️" },
+    { value: "gain_weight", label: "לעלות במשקל", emoji: "⬆️" },
+    { value: "maintain", label: "שמירה", emoji: "⚖️" },
+    { value: "feel_better", label: "הרגשה טובה", emoji: "✨" },
+    { value: "autoimmune", label: "אוטואימונית", emoji: "🛡️" },
+    { value: "mental_clarity", label: "בהירות", emoji: "🧠" },
+];
+
+const PACE_OPTIONS: { value: GoalPace; label: string }[] = [
+    { value: "slow", label: "איטי" },
+    { value: "moderate", label: "בינוני" },
+    { value: "aggressive", label: "מהיר" },
+];
+
+const CARB_PRESETS = [20, 30, 50];
+
+function ChipSelect<T extends string>({
+    options,
+    value,
+    onChange,
+}: {
+    options: { value: T; label: string }[];
+    value: T;
+    onChange: (v: T) => void;
+}) {
+    return (
+        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>
+            {options.map((opt) => {
+                const active = opt.value === value;
+                return (
+                    <TouchableOpacity
+                        key={opt.value}
+                        onPress={() => onChange(opt.value)}
+                        activeOpacity={0.7}
+                        style={{
+                            paddingHorizontal: 16,
+                            paddingVertical: 12,
+                            borderRadius: 12,
+                            backgroundColor: active ? `${C.maroon}20` : C.card2,
+                            borderWidth: 1.5,
+                            borderColor: active ? C.maroon : C.border,
+                        }}
+                    >
+                        <Text style={{
+                            color: active ? C.text : C.textDim,
+                            fontSize: 13,
+                            fontFamily: active ? 'Assistant_700Bold' : 'Assistant_400Regular',
+                        }}>
+                            {opt.label}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
+        </View>
+    );
+}
 
 function DarkInput({
     value,
@@ -43,7 +102,7 @@ function DarkInput({
             style={{
                 height: 52,
                 backgroundColor: C.card2,
-                borderRadius: 14,
+                borderRadius: 16,
                 paddingHorizontal: 16,
                 color: C.text,
                 fontSize: 15,
@@ -62,13 +121,13 @@ function SectionCard({ title, icon, children }: { title: string; icon: React.Rea
             style={{
                 backgroundColor: C.card,
                 borderRadius: 24,
-                padding: 22,
-                marginBottom: 14,
+                padding: 24,
+                marginBottom: 16,
                 borderWidth: 1,
                 borderColor: C.border,
             }}
         >
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                 {icon}
                 <Text style={{ color: C.text, fontSize: 17, fontFamily: 'Assistant_700Bold' }}>
                     {title}
@@ -97,27 +156,36 @@ export default function ProfileScreen() {
     const syncFromSupabase = useUserStore((state) => state.syncFromSupabase);
     const reset = useUserStore((state) => state.reset);
 
-    const dailyGoals = useMealsStore((state) => state.dailyGoals);
     const setDailyGoals = useMealsStore((state) => state.setDailyGoals);
 
     const [form, setForm] = useState(profile);
-    const [goalsForm, setGoalsForm] = useState({
-        calories: String(dailyGoals.calories),
-        protein: String(dailyGoals.protein),
-        fat: String(dailyGoals.fat),
-        carbs: String(dailyGoals.carbs),
-    });
+    const [selectedGoal, setSelectedGoal] = useState<KetoGoal>(profile.goal);
+    const [selectedPace, setSelectedPace] = useState<GoalPace>(profile.goalPace);
+    const [selectedCarbLimit, setSelectedCarbLimit] = useState(profile.dailyCarbLimit);
 
     useEffect(() => { syncFromSupabase(); }, []);
-    useEffect(() => { setForm(profile); }, [profile]);
     useEffect(() => {
-        setGoalsForm({
-            calories: String(dailyGoals.calories),
-            protein: String(dailyGoals.protein),
-            fat: String(dailyGoals.fat),
-            carbs: String(dailyGoals.carbs),
+        setForm(profile);
+        setSelectedGoal(profile.goal);
+        setSelectedPace(profile.goalPace);
+        setSelectedCarbLimit(profile.dailyCarbLimit);
+    }, [profile]);
+
+    const computedGoals = useMemo(() => {
+        const w = parseFloat(form.weight) || 75;
+        const h = parseFloat(form.height) || 175;
+        const a = parseInt(form.age) || 30;
+        return calculateKetoGoals({
+            weight: w,
+            height: h,
+            age: a,
+            gender: form.gender,
+            activityLevel: form.activityLevel,
+            goal: selectedGoal,
+            goalPace: selectedPace,
+            carbLimit: selectedCarbLimit,
         });
-    }, [dailyGoals]);
+    }, [form.weight, form.height, form.age, form.gender, form.activityLevel, selectedGoal, selectedPace, selectedCarbLimit]);
 
     const handleSave = () => {
         setProfile(form);
@@ -125,11 +193,11 @@ export default function ProfileScreen() {
     };
 
     const handleSaveGoals = () => {
-        setDailyGoals({
-            calories: parseInt(goalsForm.calories) || dailyGoals.calories,
-            protein: parseInt(goalsForm.protein) || dailyGoals.protein,
-            fat: parseInt(goalsForm.fat) || dailyGoals.fat,
-            carbs: parseInt(goalsForm.carbs) || dailyGoals.carbs,
+        setDailyGoals(computedGoals);
+        setProfile({
+            goal: selectedGoal,
+            goalPace: selectedPace,
+            dailyCarbLimit: selectedCarbLimit,
         });
         Alert.alert("נשמר!", "היעדים היומיים עודכנו");
     };
@@ -168,7 +236,7 @@ export default function ProfileScreen() {
                             backgroundColor: `${C.maroon}20`,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            marginBottom: 14,
+                            marginBottom: 16,
                             borderWidth: 1,
                             borderColor: `${C.maroon}35`,
                             shadowColor: C.maroon,
@@ -221,7 +289,7 @@ export default function ProfileScreen() {
                                     style={{
                                         height: 52,
                                         backgroundColor: C.card2,
-                                        borderRadius: 14,
+                                        borderRadius: 16,
                                         paddingHorizontal: 16,
                                         alignItems: 'flex-end',
                                         justifyContent: 'center',
@@ -276,7 +344,7 @@ export default function ProfileScreen() {
                             flexDirection: 'row-reverse',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: 8,
+                            gap: 12,
                             shadowColor: C.maroon,
                             shadowOffset: { width: 0, height: 4 },
                             shadowOpacity: 0.35,
@@ -296,50 +364,93 @@ export default function ProfileScreen() {
                     title="יעדים יומיים"
                     icon={<Target size={18} color={C.maroon} />}
                 >
-                    <View style={{ flexDirection: 'row-reverse', gap: 12 }}>
-                        <View style={{ flex: 1 }}>
-                            <FieldRow label="קלוריות">
-                                <DarkInput
-                                    value={goalsForm.calories}
-                                    onChangeText={(t) => setGoalsForm((p) => ({ ...p, calories: t }))}
-                                    placeholder="2000"
-                                    keyboardType="numeric"
-                                />
-                            </FieldRow>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <FieldRow label="פחמימות (g)">
-                                <DarkInput
-                                    value={goalsForm.carbs}
-                                    onChangeText={(t) => setGoalsForm((p) => ({ ...p, carbs: t }))}
-                                    placeholder="25"
-                                    keyboardType="numeric"
-                                />
-                            </FieldRow>
-                        </View>
-                    </View>
+                    <FieldRow label="מטרה">
+                        <ChipSelect
+                            options={GOAL_OPTIONS.map(o => ({ value: o.value, label: `${o.emoji} ${o.label}` }))}
+                            value={selectedGoal}
+                            onChange={setSelectedGoal}
+                        />
+                    </FieldRow>
 
-                    <View style={{ flexDirection: 'row-reverse', gap: 12 }}>
-                        <View style={{ flex: 1 }}>
-                            <FieldRow label="שומן (g)">
-                                <DarkInput
-                                    value={goalsForm.fat}
-                                    onChangeText={(t) => setGoalsForm((p) => ({ ...p, fat: t }))}
-                                    placeholder="150"
-                                    keyboardType="numeric"
-                                />
-                            </FieldRow>
+                    {(selectedGoal === 'lose_weight' || selectedGoal === 'gain_weight') && (
+                        <FieldRow label="קצב">
+                            <ChipSelect
+                                options={PACE_OPTIONS}
+                                value={selectedPace}
+                                onChange={setSelectedPace}
+                            />
+                        </FieldRow>
+                    )}
+
+                    <FieldRow label="מגבלת פחמימות יומית">
+                        <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+                            {CARB_PRESETS.map((v) => {
+                                const active = selectedCarbLimit === v;
+                                return (
+                                    <TouchableOpacity
+                                        key={v}
+                                        onPress={() => setSelectedCarbLimit(v)}
+                                        activeOpacity={0.7}
+                                        style={{
+                                            flex: 1,
+                                            paddingVertical: 12,
+                                            borderRadius: 12,
+                                            backgroundColor: active ? `${C.maroon}20` : C.card2,
+                                            borderWidth: 1.5,
+                                            borderColor: active ? C.maroon : C.border,
+                                            alignItems: 'center',
+                                        }}
+                                    >
+                                        <Text style={{
+                                            color: active ? C.text : C.textDim,
+                                            fontSize: 15,
+                                            fontFamily: active ? 'Assistant_700Bold' : 'Assistant_400Regular',
+                                        }}>
+                                            {v}g
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <FieldRow label="חלבון (g)">
-                                <DarkInput
-                                    value={goalsForm.protein}
-                                    onChangeText={(t) => setGoalsForm((p) => ({ ...p, protein: t }))}
-                                    placeholder="100"
-                                    keyboardType="numeric"
-                                />
-                            </FieldRow>
-                        </View>
+                    </FieldRow>
+
+                    <View
+                        style={{
+                            backgroundColor: C.card2,
+                            borderRadius: 16,
+                            padding: 16,
+                            borderWidth: 1,
+                            borderColor: C.border,
+                            marginBottom: 16,
+                            gap: 12,
+                        }}
+                    >
+                        <Text style={{ color: C.textDim, fontSize: 11, fontFamily: 'Assistant_400Regular', textAlign: 'right' }}>
+                            מחושב על בסיס הפרופיל שלך
+                        </Text>
+                        {[
+                            { label: "קלוריות", value: `${computedGoals.calories}`, color: "#F97316" },
+                            { label: "שומן", value: `${computedGoals.fat}g`, color: C.green },
+                            { label: "חלבון", value: `${computedGoals.protein}g`, color: "#3b82f6" },
+                            { label: "פחמימות", value: `${computedGoals.carbs}g`, color: "#f59e0b" },
+                        ].map((row, i) => (
+                            <View
+                                key={i}
+                                style={{
+                                    flexDirection: 'row-reverse',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    paddingVertical: 8,
+                                }}
+                            >
+                                <Text style={{ color: C.textDim, fontSize: 14, fontFamily: 'Assistant_400Regular' }}>
+                                    {row.label}
+                                </Text>
+                                <Text style={{ color: row.color, fontSize: 18, fontFamily: 'Assistant_700Bold' }}>
+                                    {row.value}
+                                </Text>
+                            </View>
+                        ))}
                     </View>
 
                     <TouchableOpacity
@@ -352,7 +463,7 @@ export default function ProfileScreen() {
                             flexDirection: 'row-reverse',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: 8,
+                            gap: 12,
                             shadowColor: C.maroon,
                             shadowOffset: { width: 0, height: 4 },
                             shadowOpacity: 0.35,
@@ -362,7 +473,7 @@ export default function ProfileScreen() {
                     >
                         <Save size={18} color="#fff" />
                         <Text style={{ color: '#fff', fontSize: 15, fontFamily: 'Assistant_700Bold' }}>
-                            עדכן יעדים
+                            שמור יעדים
                         </Text>
                     </TouchableOpacity>
                 </SectionCard>
@@ -374,8 +485,8 @@ export default function ProfileScreen() {
                     style={{
                         backgroundColor: C.card,
                         borderRadius: 24,
-                        padding: 22,
-                        marginBottom: 14,
+                        padding: 24,
+                        marginBottom: 16,
                         borderWidth: 1,
                         borderColor: C.border,
                         flexDirection: 'row-reverse',
@@ -402,15 +513,15 @@ export default function ProfileScreen() {
                             <Text style={{ color: C.text, fontSize: 15, fontFamily: 'Assistant_700Bold', textAlign: 'right' }}>
                                 Apple Health
                             </Text>
-                            <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular', marginTop: 2 }}>
+                            <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular', marginTop: 4 }}>
                                 סנכרון צעדים ופעילות
                             </Text>
                         </View>
                     </View>
                     <View style={{
                         backgroundColor: `${C.amber}18`,
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
                         borderRadius: 8,
                         borderWidth: 1,
                         borderColor: `${C.amber}25`,
@@ -428,11 +539,11 @@ export default function ProfileScreen() {
                     style={{
                         backgroundColor: C.card,
                         borderRadius: 24,
-                        paddingVertical: 18,
+                        paddingVertical: 16,
                         flexDirection: 'row-reverse',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 10,
+                        gap: 12,
                         borderWidth: 1,
                         borderColor: C.border,
                         marginBottom: 12,
@@ -451,11 +562,11 @@ export default function ProfileScreen() {
                     style={{
                         backgroundColor: C.card,
                         borderRadius: 24,
-                        paddingVertical: 18,
+                        paddingVertical: 16,
                         flexDirection: 'row-reverse',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 10,
+                        gap: 12,
                         borderWidth: 1,
                         borderColor: `${C.red}25`,
                     }}

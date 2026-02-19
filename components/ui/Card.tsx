@@ -5,7 +5,7 @@ export function Card({ className, style, ...props }: ViewProps) {
     return (
         <View
             className={cn(
-                "rounded-3xl bg-card p-6",
+                "rounded-xl bg-card p-6",
                 className
             )}
             style={[

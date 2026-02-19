@@ -12,7 +12,6 @@ export type Recipe = {
         fat: number;
         carbs: number;
     };
-    imagePrompt?: string;
 };
 
 async function callGemini(prompt: string) {
@@ -66,7 +65,6 @@ Return ONLY a raw JSON array (no markdown, no backticks) with this EXACT structu
       "fat": number (grams of fat per serving),
       "carbs": number (grams of carbs per serving)
     },
-    "imagePrompt": "detailed English description of the dish appearance for image generation (be specific about colors, plating, garnish)"
   }
 ]
 
@@ -76,7 +74,6 @@ Important:
 - Instructions should be clear and concise (2-3 sentences)
 - ketoScore should reflect actual keto-friendliness (high fat, low carb = high score)
 - Nutrition values should be realistic estimates for a single serving
-- imagePrompt should be in English and describe the visual appearance of the dish in detail
 - Try to use the ingredients provided by the user
 - Each recipe should be different and creative`;
 
@@ -115,46 +112,3 @@ Important:
     }
 };
 
-// Generate image for recipe using Google Imagen (via Gemini API)
-export const generateRecipeImage = async (imagePrompt: string): Promise<string | null> => {
-    if (!API_KEY) return null;
-    
-    try {
-        // Using Gemini's image generation capability
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${API_KEY}`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: `Generate a realistic, appetizing photo of: ${imagePrompt}. Professional food photography style, natural lighting, white plate, garnished beautifully.`
-                        }]
-                    }],
-                    generationConfig: {
-                        temperature: 0.9,
-                    }
-                }),
-            }
-        );
-
-        const data = await response.json();
-        
-        // Extract base64 image if available
-        const imagePart = data.candidates?.[0]?.content?.parts?.find(
-            (part: any) => part.inlineData?.mimeType?.startsWith('image/')
-        );
-        
-        if (imagePart?.inlineData?.data) {
-            return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
-        }
-        
-        return null;
-    } catch (error) {
-        console.error("Error generating recipe image:", error);
-        return null;
-    }
-};

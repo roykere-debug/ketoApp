@@ -8,7 +8,9 @@ create table profiles (
   height text,
   gender text,
   activity_level text,
-  daily_carb_limit numeric
+  daily_carb_limit numeric,
+  goal text default 'lose_weight',
+  goal_pace text default 'moderate'
 );
 
 -- Set up Row Level Security (RLS)

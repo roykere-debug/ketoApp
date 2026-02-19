@@ -1,11 +1,12 @@
-import { View, TouchableOpacity, ScrollView, ActivityIndicator, Image, Alert, TextInput } from "react-native";
+import { View, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Modal } from "react-native";
 import { Text } from "../components/ui/Text";
 import { useState, useEffect } from "react";
-import { suggestRecipes, Recipe, generateRecipeImage } from "../services/recipes";
+import { suggestRecipes, Recipe } from "../services/recipes";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ChefHat, X, Plus, Sparkles, Flame, Beef, Droplet, Wheat, Heart, BookMarked } from "lucide-react-native";
+import { ChefHat, X, Plus, Sparkles, Flame, Beef, Droplet, Wheat, Heart, BookMarked, ChevronRight, Minus } from "lucide-react-native";
 import { useMealsStore } from "../store/mealsStore";
 import { useFavoritesStore } from "../store/favoritesStore";
+import { useRouter } from "expo-router";
 
 const C = {
     bg: "#0A0A0C",
@@ -32,7 +33,7 @@ function NutritionTile({ icon, value, label }: { icon: React.ReactNode; value: s
                 style={{
                     width: 44,
                     height: 44,
-                    borderRadius: 14,
+                    borderRadius: 16,
                     backgroundColor: C.card2,
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -44,20 +45,18 @@ function NutritionTile({ icon, value, label }: { icon: React.ReactNode; value: s
                 {icon}
             </View>
             <Text style={{ color: C.text, fontSize: 14, fontFamily: 'Assistant_700Bold' }}>{value}</Text>
-            <Text style={{ color: C.textDim, fontSize: 10, fontFamily: 'Assistant_400Regular', marginTop: 2 }}>{label}</Text>
+            <Text style={{ color: C.textDim, fontSize: 10, fontFamily: 'Assistant_400Regular', marginTop: 4 }}>{label}</Text>
         </View>
     );
 }
 
 function RecipeCard({
     item,
-    imageUrl,
     isFav,
     onToggleFav,
     onAddToLog,
 }: {
     item: Recipe;
-    imageUrl?: string | null;
     isFav: boolean;
     onToggleFav: () => void;
     onAddToLog: () => void;
@@ -73,18 +72,11 @@ function RecipeCard({
                 borderColor: C.border,
             }}
         >
-            {/* Image area */}
-            <View style={{ width: '100%', height: 200, backgroundColor: C.card2 }}>
-                {imageUrl ? (
-                    <Image source={{ uri: imageUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                ) : (
-                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                        <ChefHat size={48} color={C.textDimmer} strokeWidth={1.5} />
-                        <ActivityIndicator size="small" color={C.maroon} style={{ marginTop: 8 }} />
-                    </View>
-                )}
-
-                {/* Overlay buttons */}
+            {/* Icon placeholder + overlay */}
+            <View style={{ width: '100%', height: 140, backgroundColor: C.card2 }}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <ChefHat size={48} color={`${C.maroon}50`} strokeWidth={1.5} />
+                </View>
                 <View
                     style={{
                         position: 'absolute',
@@ -101,7 +93,7 @@ function RecipeCard({
                         style={{
                             width: 46,
                             height: 46,
-                            borderRadius: 14,
+                            borderRadius: 16,
                             backgroundColor: C.maroon,
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -120,7 +112,7 @@ function RecipeCard({
                         style={{
                             width: 46,
                             height: 46,
-                            borderRadius: 14,
+                            borderRadius: 16,
                             backgroundColor: isFav ? C.maroon : 'rgba(0,0,0,0.6)',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -149,7 +141,7 @@ function RecipeCard({
                         style={{
                             width: 44,
                             height: 44,
-                            borderRadius: 14,
+                            borderRadius: 16,
                             backgroundColor: `${C.maroon}20`,
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -165,7 +157,7 @@ function RecipeCard({
                 </View>
 
                 {/* Ingredients */}
-                <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular', textAlign: 'right', marginBottom: 10, letterSpacing: 0.5 }}>
+                <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular', textAlign: 'right', marginBottom: 12, letterSpacing: 0.5 }}>
                     מרכיבים
                 </Text>
                 <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
@@ -175,8 +167,8 @@ function RecipeCard({
                             style={{
                                 backgroundColor: C.card2,
                                 paddingHorizontal: 12,
-                                paddingVertical: 6,
-                                borderRadius: 10,
+                                paddingVertical: 8,
+                                borderRadius: 12,
                                 borderWidth: 1,
                                 borderColor: C.border,
                             }}
@@ -198,7 +190,7 @@ function RecipeCard({
 
                 {/* Nutrition */}
                 <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingTop: 16 }}>
-                    <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular', textAlign: 'right', marginBottom: 14, letterSpacing: 0.5 }}>
+                    <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular', textAlign: 'right', marginBottom: 16, letterSpacing: 0.5 }}>
                         ערכים תזונתיים
                     </Text>
                     <View style={{ flexDirection: 'row-reverse' }}>
@@ -213,13 +205,231 @@ function RecipeCard({
     );
 }
 
+function PortionModal({
+    visible,
+    recipe,
+    onClose,
+    onConfirm,
+}: {
+    visible: boolean;
+    recipe: Recipe | null;
+    onClose: () => void;
+    onConfirm: (portion: number) => void;
+}) {
+    const [portion, setPortion] = useState(100);
+
+    useEffect(() => {
+        if (visible) setPortion(100);
+    }, [visible]);
+
+    if (!recipe) return null;
+
+    const multiplier = portion / 100;
+    const adjusted = {
+        calories: Math.round(recipe.nutrition.calories * multiplier),
+        protein: Math.round(recipe.nutrition.protein * multiplier),
+        fat: Math.round(recipe.nutrition.fat * multiplier),
+        carbs: Math.round(recipe.nutrition.carbs * multiplier),
+    };
+
+    const PRESETS = [25, 50, 75, 100, 150];
+
+    return (
+        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+                {/* Header */}
+                <View
+                    style={{
+                        flexDirection: 'row-reverse',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingHorizontal: 20,
+                        paddingVertical: 16,
+                        borderBottomWidth: 1,
+                        borderBottomColor: C.border,
+                    }}
+                >
+                    <TouchableOpacity
+                        onPress={onClose}
+                        activeOpacity={0.7}
+                        style={{
+                            width: 44,
+                            height: 44,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 16,
+                            backgroundColor: C.card2,
+                            borderWidth: 1,
+                            borderColor: C.border,
+                        }}
+                    >
+                        <X size={22} color={C.textDim} strokeWidth={2.5} />
+                    </TouchableOpacity>
+                    <Text style={{ color: C.text, fontSize: 20, fontFamily: 'Assistant_700Bold' }}>
+                        כמה אכלת?
+                    </Text>
+                    <View style={{ width: 44 }} />
+                </View>
+
+                <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                    {/* Recipe name */}
+                    <Text style={{ color: C.text, fontSize: 18, fontFamily: 'Assistant_700Bold', textAlign: 'right', marginBottom: 24 }}>
+                        {recipe.title}
+                    </Text>
+
+                    {/* Portion slider area */}
+                    <View
+                        style={{
+                            backgroundColor: C.card,
+                            borderRadius: 24,
+                            padding: 24,
+                            marginBottom: 20,
+                            borderWidth: 1,
+                            borderColor: C.border,
+                        }}
+                    >
+                        <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular', textAlign: 'right', marginBottom: 16, letterSpacing: 0.5 }}>
+                            אחוז מהמנה
+                        </Text>
+
+                        {/* Portion display + controls */}
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 20 }}>
+                            <TouchableOpacity
+                                onPress={() => setPortion((p) => Math.max(10, p - 10))}
+                                activeOpacity={0.7}
+                                style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 16,
+                                    backgroundColor: C.card2,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderWidth: 1,
+                                    borderColor: C.border,
+                                }}
+                            >
+                                <Minus size={20} color={C.text} strokeWidth={2.5} />
+                            </TouchableOpacity>
+
+                            <View style={{ alignItems: 'center', minWidth: 100 }}>
+                                <Text style={{ color: C.maroon, fontSize: 48, fontFamily: 'Assistant_700Bold', lineHeight: 56 }}>
+                                    {portion}%
+                                </Text>
+                                <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular', marginTop: 4 }}>
+                                    מהמנה המלאה
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={() => setPortion((p) => Math.min(300, p + 10))}
+                                activeOpacity={0.7}
+                                style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 16,
+                                    backgroundColor: C.card2,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderWidth: 1,
+                                    borderColor: C.border,
+                                }}
+                            >
+                                <Plus size={20} color={C.text} strokeWidth={2.5} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Quick presets */}
+                        <View style={{ flexDirection: 'row-reverse', gap: 8, justifyContent: 'center' }}>
+                            {PRESETS.map((val) => {
+                                const active = portion === val;
+                                return (
+                                    <TouchableOpacity
+                                        key={val}
+                                        onPress={() => setPortion(val)}
+                                        activeOpacity={0.7}
+                                        style={{
+                                            flex: 1,
+                                            paddingVertical: 12,
+                                            borderRadius: 12,
+                                            backgroundColor: active ? `${C.maroon}20` : C.card2,
+                                            borderWidth: 1.5,
+                                            borderColor: active ? C.maroon : C.border,
+                                            alignItems: 'center',
+                                        }}
+                                    >
+                                        <Text style={{
+                                            color: active ? C.text : C.textDim,
+                                            fontSize: 13,
+                                            fontFamily: active ? 'Assistant_700Bold' : 'Assistant_400Regular',
+                                        }}>
+                                            {val}%
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </View>
+
+                    {/* Adjusted nutrition */}
+                    <View
+                        style={{
+                            backgroundColor: C.card,
+                            borderRadius: 24,
+                            padding: 24,
+                            marginBottom: 24,
+                            borderWidth: 1,
+                            borderColor: C.border,
+                        }}
+                    >
+                        <Text style={{ color: C.textDim, fontSize: 12, fontFamily: 'Assistant_400Regular', textAlign: 'right', marginBottom: 16, letterSpacing: 0.5 }}>
+                            ערכים תזונתיים מחושבים
+                        </Text>
+                        <View style={{ flexDirection: 'row-reverse' }}>
+                            <NutritionTile icon={<Flame size={18} color={C.orange} />} value={`${adjusted.calories}`} label="קלוריות" />
+                            <NutritionTile icon={<Beef size={18} color={C.blue} />} value={`${adjusted.protein}g`} label="חלבון" />
+                            <NutritionTile icon={<Droplet size={18} color={C.green} />} value={`${adjusted.fat}g`} label="שומן" />
+                            <NutritionTile icon={<Wheat size={18} color={C.amber} />} value={`${adjusted.carbs}g`} label="פחמימות" />
+                        </View>
+                    </View>
+
+                    {/* Confirm button */}
+                    <TouchableOpacity
+                        onPress={() => onConfirm(portion)}
+                        activeOpacity={0.85}
+                        style={{
+                            backgroundColor: C.maroon,
+                            borderRadius: 20,
+                            paddingVertical: 16,
+                            alignItems: 'center',
+                            flexDirection: 'row-reverse',
+                            justifyContent: 'center',
+                            gap: 8,
+                            shadowColor: C.maroon,
+                            shadowOffset: { width: 0, height: 6 },
+                            shadowOpacity: 0.4,
+                            shadowRadius: 14,
+                            elevation: 8,
+                        }}
+                    >
+                        <Plus size={20} color="#fff" strokeWidth={2.5} />
+                        <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Assistant_700Bold' }}>
+                            הוסף ליומן
+                        </Text>
+                    </TouchableOpacity>
+                </ScrollView>
+            </SafeAreaView>
+        </Modal>
+    );
+}
+
 export default function RecipesScreen() {
+    const router = useRouter();
     const [ingredientInput, setIngredientInput] = useState("");
     const [ingredients, setIngredients] = useState<string[]>([]);
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState(false);
-    const [recipeImages, setRecipeImages] = useState<{ [key: string]: string | null }>({});
     const [viewMode, setViewMode] = useState<ViewMode>('search');
+    const [portionRecipe, setPortionRecipe] = useState<Recipe | null>(null);
 
     const addMeal = useMealsStore((state) => state.addMeal);
     const { favoriteRecipes, addFavorite, removeFavorite, isFavorite, loadFavorites } = useFavoritesStore();
@@ -242,36 +452,36 @@ export default function RecipesScreen() {
         else addFavorite(recipe);
     };
 
-    const addRecipeToLog = (recipe: Recipe) => {
-        const carbRatio = recipe.nutrition.carbs / (recipe.nutrition.carbs + recipe.nutrition.fat + recipe.nutrition.protein);
+    const confirmAddToLog = (portion: number) => {
+        if (!portionRecipe) return;
+        const recipe = portionRecipe;
+        const multiplier = portion / 100;
+        const carbs = recipe.nutrition.carbs * multiplier;
+        const fat = recipe.nutrition.fat * multiplier;
+        const protein = recipe.nutrition.protein * multiplier;
+        const carbRatio = carbs / (carbs + fat + protein || 1);
         const ketoScore = Math.max(1, Math.min(10, 10 - carbRatio * 30));
         addMeal({
             name: recipe.title,
-            calories: recipe.nutrition.calories,
-            protein: recipe.nutrition.protein,
-            fat: recipe.nutrition.fat,
-            carbs: recipe.nutrition.carbs,
+            calories: Math.round(recipe.nutrition.calories * multiplier),
+            protein: Math.round(protein),
+            fat: Math.round(fat),
+            carbs: Math.round(carbs),
             ketoScore: Math.round(ketoScore * 10) / 10,
         });
-        Alert.alert("נוסף ליומן! ✅", `${recipe.title} נוסף ליומן האוכל שלך`);
+        setPortionRecipe(null);
+        Alert.alert("נוסף ליומן! ✅", `${recipe.title} נוסף ליומן האוכל שלך (${portion}%)`);
     };
 
     const handleSearch = async () => {
         if (ingredients.length === 0) return;
         setLoading(true);
         setRecipes([]);
-        setRecipeImages({});
         try {
             const results = await suggestRecipes(ingredients);
             setRecipes(results);
-            results.forEach(async (recipe) => {
-                if (recipe.imagePrompt) {
-                    const imageUrl = await generateRecipeImage(recipe.imagePrompt);
-                    if (imageUrl) setRecipeImages((prev) => ({ ...prev, [recipe.id]: imageUrl }));
-                }
-            });
-        } catch {
-            // silent
+        } catch (error) {
+            Alert.alert("שגיאה", "לא הצלחנו לייצר מתכונים. נסה שוב מאוחר יותר.");
         } finally {
             setLoading(false);
         }
@@ -279,17 +489,48 @@ export default function RecipesScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+            {/* Fixed header with back button */}
+            <View
+                style={{
+                    flexDirection: 'row-reverse',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 20,
+                    paddingVertical: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: C.border,
+                }}
+            >
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    activeOpacity={0.7}
+                    style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 16,
+                        backgroundColor: C.card2,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: C.border,
+                    }}
+                >
+                    <ChevronRight size={22} color={C.text} strokeWidth={2.5} />
+                </TouchableOpacity>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
+                    <ChefHat size={24} color={C.maroon} strokeWidth={2} />
+                    <Text style={{ color: C.text, fontSize: 20, fontFamily: 'Assistant_700Bold' }}>מתכונים קיטו</Text>
+                </View>
+                <View style={{ width: 44 }} />
+            </View>
+
             <ScrollView
                 style={{ flex: 1 }}
                 contentContainerStyle={{ paddingBottom: 48 }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header */}
-                <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 }}>
-                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                        <ChefHat size={30} color={C.maroon} strokeWidth={2} />
-                        <Text style={{ color: C.text, fontSize: 30, fontFamily: 'Assistant_700Bold' }}>מתכונים קיטו</Text>
-                    </View>
+                {/* Sub-header */}
+                <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}>
                     <Text style={{ color: C.textDim, fontSize: 13, fontFamily: 'Assistant_400Regular', textAlign: 'right' }}>
                         חפש מתכונים חדשים או צפה במועדפים שלך
                     </Text>
@@ -320,7 +561,7 @@ export default function RecipesScreen() {
                                     flexDirection: 'row-reverse',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    gap: 6,
+                                    gap: 8,
                                     paddingVertical: 12,
                                     borderRadius: 16,
                                     backgroundColor: viewMode === tab.key ? C.maroon : 'transparent',
@@ -364,13 +605,13 @@ export default function RecipesScreen() {
                                 הוסף מרכיבים
                             </Text>
 
-                            <View style={{ flexDirection: 'row-reverse', gap: 10, marginBottom: 16 }}>
+                            <View style={{ flexDirection: 'row-reverse', gap: 12, marginBottom: 16 }}>
                                 <TextInput
                                     style={{
                                         flex: 1,
-                                        height: 50,
+                                        height: 52,
                                         backgroundColor: C.card2,
-                                        borderRadius: 14,
+                                        borderRadius: 16,
                                         paddingHorizontal: 16,
                                         color: C.text,
                                         fontSize: 14,
@@ -391,9 +632,9 @@ export default function RecipesScreen() {
                                     disabled={!ingredientInput.trim()}
                                     activeOpacity={0.8}
                                     style={{
-                                        width: 50,
-                                        height: 50,
-                                        borderRadius: 14,
+                                        width: 52,
+                                        height: 52,
+                                        borderRadius: 16,
                                         backgroundColor: ingredientInput.trim() ? C.maroon : C.card2,
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -416,7 +657,7 @@ export default function RecipesScreen() {
                                             style={{
                                                 flexDirection: 'row-reverse',
                                                 alignItems: 'center',
-                                                gap: 6,
+                                                gap: 8,
                                                 backgroundColor: `${C.maroon}18`,
                                                 paddingHorizontal: 12,
                                                 paddingVertical: 8,
@@ -443,7 +684,7 @@ export default function RecipesScreen() {
                                     flexDirection: 'row-reverse',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    gap: 8,
+                                    gap: 12,
                                     shadowColor: C.maroon,
                                     shadowOffset: { width: 0, height: 4 },
                                     shadowOpacity: ingredients.length > 0 && !loading ? 0.4 : 0,
@@ -471,10 +712,9 @@ export default function RecipesScreen() {
                                     <RecipeCard
                                         key={item.id}
                                         item={item}
-                                        imageUrl={recipeImages[item.id]}
                                         isFav={isFavorite(item.id)}
                                         onToggleFav={() => toggleFavorite(item)}
-                                        onAddToLog={() => addRecipeToLog(item)}
+                                        onAddToLog={() => setPortionRecipe(item)}
                                     />
                                 ))}
                             </View>
@@ -532,10 +772,9 @@ export default function RecipesScreen() {
                                     <RecipeCard
                                         key={item.id}
                                         item={item}
-                                        imageUrl={null}
                                         isFav={true}
                                         onToggleFav={() => removeFavorite(item.id)}
-                                        onAddToLog={() => addRecipeToLog(item)}
+                                        onAddToLog={() => setPortionRecipe(item)}
                                     />
                                 ))}
                             </>
@@ -576,6 +815,13 @@ export default function RecipesScreen() {
                     </View>
                 )}
             </ScrollView>
+
+            <PortionModal
+                visible={!!portionRecipe}
+                recipe={portionRecipe}
+                onClose={() => setPortionRecipe(null)}
+                onConfirm={confirmAddToLog}
+            />
         </SafeAreaView>
     );
 }

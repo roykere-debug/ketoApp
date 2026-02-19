@@ -6,8 +6,9 @@ import { useRouter } from "expo-router";
 import { useMealsStore } from "../../store/mealsStore";
 import { useUserStore } from "../../store/userStore";
 import type { Meal } from "../../store/mealsStore";
-import { Trash2, Camera, UtensilsCrossed, Plus, Sparkles, ChevronLeft } from "lucide-react-native";
+import { Trash2, Camera, UtensilsCrossed, Plus, Sparkles, ChevronLeft, Clock, Pencil } from "lucide-react-native";
 import AddFoodModal from "../../components/modals/AddFoodModal";
+import EditMealModal from "../../components/modals/EditMealModal";
 import { getKetoImprovementSuggestions, type KetoSuggestion } from "../../services/ai";
 import * as Haptics from "expo-haptics";
 
@@ -128,9 +129,9 @@ function ScoreRing({ score }: { score: number }) {
             </Animated.View>
             <View
                 style={{
-                    marginTop: 14,
+                    marginTop: 16,
                     paddingHorizontal: 20,
-                    paddingVertical: 7,
+                    paddingVertical: 8,
                     borderRadius: 20,
                     backgroundColor: `${color}18`,
                     borderWidth: 1,
@@ -167,7 +168,7 @@ function MacroTile({
                 flex: 1,
                 backgroundColor: C.card2,
                 borderRadius: 16,
-                padding: 13,
+                padding: 12,
                 alignItems: "center",
                 borderWidth: 1,
                 borderColor: C.border,
@@ -231,7 +232,7 @@ function CarbBar({ current, goal }: { current: number; goal: number }) {
                     flexDirection: "row-reverse",
                     justifyContent: "space-between",
                     alignItems: "flex-end",
-                    marginBottom: 14,
+                    marginBottom: 16,
                 }}
             >
                 <View style={{ alignItems: "flex-end" }}>
@@ -248,7 +249,7 @@ function CarbBar({ current, goal }: { current: number; goal: number }) {
                         style={{
                             color: C.textDim,
                             fontSize: 12,
-                            marginTop: 3,
+                            marginTop: 4,
                             fontFamily: "Assistant_400Regular",
                         }}
                     >
@@ -282,7 +283,7 @@ function CarbBar({ current, goal }: { current: number; goal: number }) {
                 style={{
                     height: 5,
                     backgroundColor: C.border,
-                    borderRadius: 3,
+                    borderRadius: 4,
                     overflow: "hidden",
                 }}
             >
@@ -291,7 +292,7 @@ function CarbBar({ current, goal }: { current: number; goal: number }) {
                         height: "100%",
                         width: barWidth,
                         backgroundColor: barColor,
-                        borderRadius: 3,
+                        borderRadius: 4,
                         shadowColor: barColor,
                         shadowOffset: { width: 0, height: 0 },
                         shadowOpacity: 0.9,
@@ -306,7 +307,7 @@ function CarbBar({ current, goal }: { current: number; goal: number }) {
                         color: C.amber,
                         fontSize: 11,
                         textAlign: "right",
-                        marginTop: 10,
+                        marginTop: 12,
                         fontFamily: "Assistant_400Regular",
                     }}
                 >
@@ -318,7 +319,7 @@ function CarbBar({ current, goal }: { current: number; goal: number }) {
 }
 
 // ─── Meal Card ────────────────────────────────────────────────────────────────
-function MealCard({ meal, onDelete }: { meal: Meal; onDelete: () => void }) {
+function MealCard({ meal, onEdit, onDelete }: { meal: Meal; onEdit: () => void; onDelete: () => void }) {
     const color = scoreColor(meal.ketoScore);
     const time = new Date(meal.timestamp).toLocaleTimeString("he-IL", {
         hour: "2-digit",
@@ -331,7 +332,7 @@ function MealCard({ meal, onDelete }: { meal: Meal; onDelete: () => void }) {
                 flexDirection: "row-reverse",
                 backgroundColor: C.card,
                 borderRadius: 20,
-                marginBottom: 10,
+                marginBottom: 12,
                 borderWidth: 1,
                 borderColor: C.border,
                 overflow: "hidden",
@@ -356,7 +357,7 @@ function MealCard({ meal, onDelete }: { meal: Meal; onDelete: () => void }) {
                         flexDirection: "row-reverse",
                         justifyContent: "space-between",
                         alignItems: "flex-start",
-                        marginBottom: 14,
+                        marginBottom: 16,
                     }}
                 >
                     <View style={{ flex: 1 }}>
@@ -387,7 +388,7 @@ function MealCard({ meal, onDelete }: { meal: Meal; onDelete: () => void }) {
                         style={{
                             flexDirection: "row",
                             alignItems: "center",
-                            gap: 10,
+                            gap: 12,
                             marginLeft: 12,
                         }}
                     >
@@ -395,7 +396,7 @@ function MealCard({ meal, onDelete }: { meal: Meal; onDelete: () => void }) {
                             style={{
                                 width: 44,
                                 height: 44,
-                                borderRadius: 14,
+                                borderRadius: 16,
                                 backgroundColor: `${color}18`,
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -414,11 +415,18 @@ function MealCard({ meal, onDelete }: { meal: Meal; onDelete: () => void }) {
                             </Text>
                         </View>
                         <TouchableOpacity
+                            onPress={onEdit}
+                            activeOpacity={0.6}
+                            style={{ padding: 8 }}
+                        >
+                            <Pencil size={16} color={C.textDim} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
                             onPress={onDelete}
                             activeOpacity={0.6}
-                            style={{ padding: 4 }}
+                            style={{ padding: 8 }}
                         >
-                            <Trash2 size={18} color={C.textDimmer} />
+                            <Trash2 size={16} color={C.textDimmer} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -453,7 +461,7 @@ function MealCard({ meal, onDelete }: { meal: Meal; onDelete: () => void }) {
                                 style={{
                                     color: C.textDim,
                                     fontSize: 10,
-                                    marginTop: 3,
+                                    marginTop: 4,
                                     fontFamily: "Assistant_400Regular",
                                 }}
                             >
@@ -471,6 +479,7 @@ function MealCard({ meal, onDelete }: { meal: Meal; onDelete: () => void }) {
 export default function DashboardScreen() {
     const router = useRouter();
     const [showAddFoodModal, setShowAddFoodModal] = useState(false);
+    const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
     const [aiSuggestions, setAiSuggestions] = useState<KetoSuggestion | null>(null);
     const [loadingAiSuggestions, setLoadingAiSuggestions] = useState(false);
 
@@ -554,6 +563,11 @@ export default function DashboardScreen() {
                 visible={showAddFoodModal}
                 onClose={() => setShowAddFoodModal(false)}
             />
+            <EditMealModal
+                visible={!!editingMeal}
+                meal={editingMeal}
+                onClose={() => setEditingMeal(null)}
+            />
 
             <ScrollView
                 style={{ flex: 1 }}
@@ -616,12 +630,12 @@ export default function DashboardScreen() {
                     style={{
                         marginHorizontal: 20,
                         backgroundColor: C.card,
-                        borderRadius: 28,
+                        borderRadius: 24,
                         padding: 24,
                         borderWidth: 1,
                         borderColor: C.border,
                         alignItems: "center",
-                        marginBottom: 14,
+                        marginBottom: 16,
                     }}
                 >
                     <Text
@@ -673,18 +687,18 @@ export default function DashboardScreen() {
                     style={{
                         marginHorizontal: 20,
                         backgroundColor: C.card,
-                        borderRadius: 28,
+                        borderRadius: 24,
                         padding: 24,
                         borderWidth: 1,
                         borderColor: C.border,
-                        marginBottom: 14,
+                        marginBottom: 16,
                     }}
                 >
                     <CarbBar current={totals.carbs} goal={dailyGoals.carbs} />
                 </View>
 
                 {/* ── AI Button ── */}
-                <View style={{ marginHorizontal: 20, marginBottom: 14 }}>
+                <View style={{ marginHorizontal: 20, marginBottom: 16 }}>
                     <TouchableOpacity
                         onPress={handleAskAi}
                         disabled={loadingAiSuggestions}
@@ -693,7 +707,7 @@ export default function DashboardScreen() {
                             flexDirection: "row-reverse",
                             alignItems: "center",
                             justifyContent: "center",
-                            gap: 10,
+                            gap: 12,
                             backgroundColor: C.card,
                             borderRadius: 20,
                             paddingVertical: 16,
@@ -724,19 +738,19 @@ export default function DashboardScreen() {
                         style={{
                             marginHorizontal: 20,
                             backgroundColor: C.card,
-                            borderRadius: 28,
+                            borderRadius: 24,
                             padding: 24,
                             borderWidth: 1,
                             borderColor: `${C.maroon}30`,
-                            marginBottom: 14,
+                            marginBottom: 16,
                         }}
                     >
                         <View
                             style={{
                                 flexDirection: "row-reverse",
                                 alignItems: "center",
-                                gap: 8,
-                                marginBottom: 14,
+                                gap: 12,
+                                marginBottom: 16,
                             }}
                         >
                             <Sparkles size={18} color={C.maroon} />
@@ -782,7 +796,7 @@ export default function DashboardScreen() {
                                         backgroundColor: `${C.maroon}25`,
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        marginTop: 1,
+                                        marginTop: 4,
                                     }}
                                 >
                                     <Text
@@ -844,7 +858,7 @@ export default function DashboardScreen() {
                             flex: 1,
                             backgroundColor: C.maroon,
                             borderRadius: 24,
-                            paddingVertical: 22,
+                            paddingVertical: 24,
                             alignItems: "center",
                             shadowColor: C.maroon,
                             shadowOffset: { width: 0, height: 8 },
@@ -859,7 +873,7 @@ export default function DashboardScreen() {
                                 color: "#fff",
                                 fontFamily: "Assistant_700Bold",
                                 fontSize: 14,
-                                marginTop: 10,
+                                marginTop: 12,
                             }}
                         >
                             סרוק ארוחה
@@ -873,7 +887,7 @@ export default function DashboardScreen() {
                             flex: 1,
                             backgroundColor: C.card,
                             borderRadius: 24,
-                            paddingVertical: 22,
+                            paddingVertical: 24,
                             alignItems: "center",
                             borderWidth: 1,
                             borderColor: C.border,
@@ -885,7 +899,7 @@ export default function DashboardScreen() {
                                 color: C.text,
                                 fontFamily: "Assistant_700Bold",
                                 fontSize: 14,
-                                marginTop: 10,
+                                marginTop: 12,
                             }}
                         >
                             מתכונים
@@ -903,35 +917,63 @@ export default function DashboardScreen() {
                             marginBottom: 16,
                         }}
                     >
-                        <Text
-                            style={{
-                                color: C.text,
-                                fontSize: 20,
-                                fontFamily: "Assistant_700Bold",
-                            }}
-                        >
-                            הארוחות שלי
-                        </Text>
-                        <View
-                            style={{
-                                backgroundColor: `${C.maroon}20`,
-                                borderRadius: 10,
-                                paddingHorizontal: 12,
-                                paddingVertical: 5,
-                                borderWidth: 1,
-                                borderColor: `${C.maroon}30`,
-                            }}
-                        >
+                        <View style={{ flexDirection: "row-reverse", alignItems: "center", gap: 8 }}>
                             <Text
                                 style={{
-                                    color: C.maroon,
-                                    fontSize: 13,
+                                    color: C.text,
+                                    fontSize: 20,
                                     fontFamily: "Assistant_700Bold",
                                 }}
                             >
-                                {todaysMeals.length}
+                                הארוחות שלי
                             </Text>
+                            <View
+                                style={{
+                                    backgroundColor: `${C.maroon}20`,
+                                    borderRadius: 12,
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 8,
+                                    borderWidth: 1,
+                                    borderColor: `${C.maroon}30`,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: C.maroon,
+                                        fontSize: 13,
+                                        fontFamily: "Assistant_700Bold",
+                                    }}
+                                >
+                                    {todaysMeals.length}
+                                </Text>
+                            </View>
                         </View>
+                        <TouchableOpacity
+                            onPress={() => router.push("/history")}
+                            activeOpacity={0.7}
+                            style={{
+                                flexDirection: "row-reverse",
+                                alignItems: "center",
+                                gap: 12,
+                                paddingVertical: 8,
+                                paddingHorizontal: 12,
+                                borderRadius: 12,
+                                backgroundColor: C.card2,
+                                borderWidth: 1,
+                                borderColor: C.border,
+                            }}
+                        >
+                            <Clock size={14} color={C.textDim} />
+                            <Text
+                                style={{
+                                    color: C.textDim,
+                                    fontSize: 12,
+                                    fontFamily: "Assistant_400Regular",
+                                }}
+                            >
+                                היסטוריה
+                            </Text>
+                        </TouchableOpacity>
                     </View>
 
                     {todaysMeals.length === 0 ? (
@@ -939,7 +981,7 @@ export default function DashboardScreen() {
                             style={{
                                 backgroundColor: C.card,
                                 borderRadius: 24,
-                                padding: 44,
+                                padding: 48,
                                 alignItems: "center",
                                 borderWidth: 1,
                                 borderColor: C.border,
@@ -949,7 +991,7 @@ export default function DashboardScreen() {
                                 style={{
                                     width: 64,
                                     height: 64,
-                                    borderRadius: 20,
+                                    borderRadius: 16,
                                     backgroundColor: C.card2,
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -988,6 +1030,7 @@ export default function DashboardScreen() {
                             <MealCard
                                 key={meal.id}
                                 meal={meal}
+                                onEdit={() => setEditingMeal(meal)}
                                 onDelete={() => removeMeal(meal.id)}
                             />
                         ))

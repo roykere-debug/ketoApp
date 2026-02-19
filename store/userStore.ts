@@ -3,6 +3,9 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 
+export type KetoGoal = 'lose_weight' | 'gain_weight' | 'maintain' | 'feel_better' | 'autoimmune' | 'mental_clarity';
+export type GoalPace = 'slow' | 'moderate' | 'aggressive';
+
 export type UserProfile = {
     name: string;
     age: string;
@@ -11,6 +14,8 @@ export type UserProfile = {
     gender: 'male' | 'female' | 'other';
     activityLevel: 'sedentary' | 'light' | 'moderate' | 'active';
     dailyCarbLimit: number;
+    goal: KetoGoal;
+    goalPace: GoalPace;
 };
 
 type UserState = {
@@ -31,6 +36,8 @@ const INITIAL_PROFILE: UserProfile = {
     gender: 'male',
     activityLevel: 'sedentary',
     dailyCarbLimit: 20,
+    goal: 'lose_weight',
+    goalPace: 'moderate',
 };
 
 export const useUserStore = create<UserState>()(
@@ -59,6 +66,8 @@ export const useUserStore = create<UserState>()(
                             gender: profile.gender,
                             activity_level: profile.activityLevel,
                             daily_carb_limit: profile.dailyCarbLimit,
+                            goal: profile.goal,
+                            goal_pace: profile.goalPace,
                         });
 
                     if (error) console.error("Supabase update error:", error);
@@ -70,7 +79,21 @@ export const useUserStore = create<UserState>()(
             reset: () => set({ profile: INITIAL_PROFILE, hasOnboarded: false, userId: null }),
 
             syncFromSupabase: async () => {
-                const { data: { session } } = await supabase.auth.getSession();
+                let session;
+                try {
+                    const { data, error } = await supabase.auth.getSession();
+                    if (error?.message?.includes('Refresh Token')) {
+                        await supabase.auth.signOut({ scope: 'local' });
+                        return;
+                    }
+                    session = data.session;
+                } catch (err: unknown) {
+                    const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message: unknown }).message) : '';
+                    if (msg.includes('Refresh Token') || msg.includes('refresh_token')) {
+                        await supabase.auth.signOut({ scope: 'local' });
+                    }
+                    return;
+                }
                 if (session?.user) {
                     const uid = session.user.id;
                     set({ userId: uid });
@@ -91,6 +114,8 @@ export const useUserStore = create<UserState>()(
                                 gender: data.gender || 'male',
                                 activityLevel: data.activity_level || 'sedentary',
                                 dailyCarbLimit: data.daily_carb_limit || 20,
+                                goal: data.goal || 'lose_weight',
+                                goalPace: data.goal_pace || 'moderate',
                             }
                         });
                     }

@@ -71,14 +71,55 @@ export const analyzeImage = async (base64Image: string): Promise<FoodAnalysis> =
     return JSON.parse(cleanContent);
 };
 
-export const getCoachResponse = async (history: any[], message: string): Promise<string> => {
-    const systemPrompt = "You are a helpful, encouraging Keto diet coach speaking in Hebrew. Keep answers concise and motivating.";
+export const getCoachResponse = async (
+    history: { role: "user" | "assistant"; text: string }[],
+    message: string,
+    mealContext?: string
+): Promise<string> => {
+    if (!API_KEY) throw new Error("Missing Google API Key");
 
-    // Gemini doesn't support system prompts in the basic 'generateContent' the same way as chat history in a simple REST call without formatting.
-    // We'll append it to the prompt for simplicity.
-    const fullPrompt = `${systemPrompt}\nUser: ${message}`;
+    const systemPrompt = `You are a helpful, encouraging Keto diet coach speaking in Hebrew. Keep answers concise and motivating.
+${mealContext ? `\nהנה המידע על הארוחות של המשתמש היום:\n${mealContext}\nהשתמש במידע הזה כדי לתת תשובות מותאמות אישית.` : ""}`;
 
-    return await callGemini(fullPrompt);
+    const contents: any[] = [];
+
+    contents.push({
+        role: "user",
+        parts: [{ text: systemPrompt + "\n\nענה תמיד בעברית, בקצרה ובאופן מעודד." }],
+    });
+    contents.push({
+        role: "model",
+        parts: [{ text: "הבנתי! אני המאמן הקיטו שלך ואני כאן לעזור. איך אני יכול לעזור?" }],
+    });
+
+    for (const msg of history.slice(1)) {
+        contents.push({
+            role: msg.role === "user" ? "user" : "model",
+            parts: [{ text: msg.text }],
+        });
+    }
+
+    contents.push({
+        role: "user",
+        parts: [{ text: message }],
+    });
+
+    const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents }),
+        }
+    );
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error("No response from Gemini");
+
+    return text;
 };
 
 export type FoodNutrition = {

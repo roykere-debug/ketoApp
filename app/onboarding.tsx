@@ -12,8 +12,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "../components/ui/Text";
 import { useRouter } from "expo-router";
-import { useUserStore } from "../store/userStore";
+import { useUserStore, KetoGoal, GoalPace } from "../store/userStore";
 import { useMealsStore } from "../store/mealsStore";
+import { calculateKetoGoals } from "../lib/ketoCalculator";
 import {
     User,
     Scale,
@@ -21,11 +22,12 @@ import {
     Flame,
     ChevronLeft,
     ChevronRight,
+    Target,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const C = {
     bg: "#0A0A0C",
@@ -56,30 +58,27 @@ const CARB_OPTIONS = [
     { value: 50, label: "50g", desc: "קיטו מתון" },
 ];
 
-function calculateDailyGoals(
-    weight: number,
-    activityLevel: ActivityLevel,
-    gender: Gender
-) {
-    const activityMultiplier: Record<ActivityLevel, number> = {
-        sedentary: 1.2,
-        light: 1.375,
-        moderate: 1.55,
-        active: 1.725,
-    };
-    const baseCal = gender === "female" ? 1600 : 2000;
-    const calories = Math.round(baseCal * activityMultiplier[activityLevel]);
-    const fat = Math.round((calories * 0.75) / 9);
-    const protein = Math.round(weight * 1.6);
-    return { calories, fat, protein };
-}
+const GOAL_OPTIONS: { value: KetoGoal; label: string; emoji: string; desc: string }[] = [
+    { value: "lose_weight", label: "לרדת במשקל", emoji: "⬇️", desc: "הפחתת שומן גוף" },
+    { value: "gain_weight", label: "לעלות במשקל", emoji: "⬆️", desc: "בניית מסת שריר" },
+    { value: "maintain", label: "לשמור על המשקל", emoji: "⚖️", desc: "שמירה על הרכב גוף" },
+    { value: "feel_better", label: "להרגיש יותר טוב", emoji: "✨", desc: "אנרגיה ובריאות כללית" },
+    { value: "autoimmune", label: "מחלות אוטואימוניות", emoji: "🛡️", desc: "הפחתת דלקת בגוף" },
+    { value: "mental_clarity", label: "בהירות מנטלית", emoji: "🧠", desc: "ריכוז וחדות מחשבה" },
+];
+
+const PACE_OPTIONS: { value: GoalPace; label: string; desc: string }[] = [
+    { value: "slow", label: "איטי", desc: "~0.25 ק\"ג בשבוע" },
+    { value: "moderate", label: "בינוני", desc: "~0.5 ק\"ג בשבוע" },
+    { value: "aggressive", label: "מהיר", desc: "~1 ק\"ג בשבוע" },
+];
 
 function ProgressBar({ step }: { step: number }) {
     return (
         <View
             style={{
                 flexDirection: "row-reverse",
-                gap: 6,
+                gap: 8,
                 paddingHorizontal: 24,
                 marginBottom: 32,
             }}
@@ -90,7 +89,7 @@ function ProgressBar({ step }: { step: number }) {
                     style={{
                         flex: 1,
                         height: 4,
-                        borderRadius: 2,
+                        borderRadius: 4,
                         backgroundColor: i <= step ? C.maroon : C.border,
                     }}
                 />
@@ -124,7 +123,7 @@ function DarkInput({
                 height: 56,
                 backgroundColor: C.card2,
                 borderRadius: 16,
-                paddingHorizontal: 18,
+                paddingHorizontal: 16,
                 color: C.text,
                 fontSize: 17,
                 fontFamily: "Assistant_400Regular",
@@ -166,7 +165,7 @@ function SelectOption({
                 style={{
                     backgroundColor: selected ? `${C.maroon}18` : C.card2,
                     borderRadius: 16,
-                    padding: 18,
+                    padding: 16,
                     borderWidth: 1.5,
                     borderColor: selected ? C.maroon : C.border,
                 }}
@@ -215,6 +214,8 @@ export default function OnboardingScreen() {
     const [weight, setWeight] = useState("");
     const [height, setHeight] = useState("");
     const [gender, setGender] = useState<Gender>("male");
+    const [goal, setGoal] = useState<KetoGoal>("lose_weight");
+    const [goalPace, setGoalPace] = useState<GoalPace>("moderate");
     const [activityLevel, setActivityLevel] = useState<ActivityLevel>("moderate");
     const [carbLimit, setCarbLimit] = useState(30);
 
@@ -251,7 +252,19 @@ export default function OnboardingScreen() {
 
     const handleFinish = async () => {
         const w = parseFloat(weight) || 75;
-        const goals = calculateDailyGoals(w, activityLevel, gender);
+        const h = parseFloat(height) || 175;
+        const a = parseInt(age) || 30;
+
+        const goals = calculateKetoGoals({
+            weight: w,
+            height: h,
+            age: a,
+            gender,
+            activityLevel,
+            goal,
+            goalPace,
+            carbLimit,
+        });
 
         await setProfile({
             name,
@@ -261,14 +274,11 @@ export default function OnboardingScreen() {
             gender,
             activityLevel,
             dailyCarbLimit: carbLimit,
+            goal,
+            goalPace,
         });
 
-        setDailyGoals({
-            calories: goals.calories,
-            protein: goals.protein,
-            fat: goals.fat,
-            carbs: carbLimit,
-        });
+        setDailyGoals(goals);
 
         completeOnboarding();
         router.replace("/(tabs)");
@@ -283,6 +293,8 @@ export default function OnboardingScreen() {
             case 2:
                 return true;
             case 3:
+                return true;
+            case 4:
                 return true;
             default:
                 return false;
@@ -395,7 +407,7 @@ export default function OnboardingScreen() {
                             {"נשתמש בנתונים כדי לחשב\nיעדים יומיים מותאמים אישית"}
                         </Text>
 
-                        <View style={{ flexDirection: "row-reverse", gap: 10 }}>
+                        <View style={{ flexDirection: "row-reverse", gap: 12 }}>
                             <SelectOption
                                 selected={gender === "male"}
                                 label="זכר"
@@ -408,7 +420,7 @@ export default function OnboardingScreen() {
                             />
                         </View>
 
-                        <View style={{ flexDirection: "row-reverse", gap: 10 }}>
+                        <View style={{ flexDirection: "row-reverse", gap: 12 }}>
                             <View style={{ flex: 1 }}>
                                 <Text
                                     style={{
@@ -472,6 +484,97 @@ export default function OnboardingScreen() {
                 );
 
             case 2:
+                const showPace = goal === "lose_weight" || goal === "gain_weight";
+                return (
+                    <View style={{ gap: 20 }}>
+                        <Animated.View
+                            style={{
+                                alignSelf: "center",
+                                marginBottom: 8,
+                                transform: [{ scale: iconScale }],
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 80,
+                                    height: 80,
+                                    borderRadius: 24,
+                                    backgroundColor: `${C.maroon}18`,
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    borderWidth: 1,
+                                    borderColor: `${C.maroon}30`,
+                                }}
+                            >
+                                <Target size={36} color={C.maroon} />
+                            </View>
+                        </Animated.View>
+                        <Text
+                            style={{
+                                color: C.text,
+                                fontSize: 28,
+                                fontFamily: "Assistant_700Bold",
+                                textAlign: "center",
+                                lineHeight: 38,
+                            }}
+                        >
+                            מה המטרה שלך?
+                        </Text>
+                        <Text
+                            style={{
+                                color: C.textDim,
+                                fontSize: 15,
+                                fontFamily: "Assistant_400Regular",
+                                textAlign: "center",
+                                lineHeight: 24,
+                            }}
+                        >
+                            {"נתאים את היעדים בדיוק\nלפי מה שחשוב לך"}
+                        </Text>
+
+                        <View style={{ gap: 12 }}>
+                            {GOAL_OPTIONS.map((opt) => (
+                                <SelectOption
+                                    key={opt.value}
+                                    selected={goal === opt.value}
+                                    label={`${opt.emoji}  ${opt.label}`}
+                                    desc={opt.desc}
+                                    onPress={() => setGoal(opt.value)}
+                                />
+                            ))}
+                        </View>
+
+                        {showPace && (
+                            <View style={{ marginTop: 8 }}>
+                                <Text
+                                    style={{
+                                        color: C.text,
+                                        fontSize: 16,
+                                        fontFamily: "Assistant_700Bold",
+                                        textAlign: "right",
+                                        marginBottom: 12,
+                                    }}
+                                >
+                                    באיזה קצב?
+                                </Text>
+                                <View style={{ flexDirection: "row-reverse", gap: 12 }}>
+                                    {PACE_OPTIONS.map((opt) => (
+                                        <View key={opt.value} style={{ flex: 1 }}>
+                                            <SelectOption
+                                                selected={goalPace === opt.value}
+                                                label={opt.label}
+                                                desc={opt.desc}
+                                                onPress={() => setGoalPace(opt.value)}
+                                            />
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                );
+
+            case 3:
                 return (
                     <View style={{ gap: 20 }}>
                         <Animated.View
@@ -508,7 +611,7 @@ export default function OnboardingScreen() {
                             רמת הפעילות שלך
                         </Text>
 
-                        <View style={{ gap: 10 }}>
+                        <View style={{ gap: 12 }}>
                             {ACTIVITY_OPTIONS.map((opt) => (
                                 <SelectOption
                                     key={opt.value}
@@ -532,7 +635,7 @@ export default function OnboardingScreen() {
                             >
                                 מגבלת פחמימות יומית
                             </Text>
-                            <View style={{ flexDirection: "row-reverse", gap: 10 }}>
+                            <View style={{ flexDirection: "row-reverse", gap: 12 }}>
                                 {CARB_OPTIONS.map((opt) => (
                                     <View key={opt.value} style={{ flex: 1 }}>
                                         <SelectOption
@@ -548,9 +651,14 @@ export default function OnboardingScreen() {
                     </View>
                 );
 
-            case 3:
+            case 4:
                 const w = parseFloat(weight) || 75;
-                const goals = calculateDailyGoals(w, activityLevel, gender);
+                const h = parseFloat(height) || 175;
+                const a = parseInt(age) || 30;
+                const computedGoals = calculateKetoGoals({
+                    weight: w, height: h, age: a, gender,
+                    activityLevel, goal, goalPace, carbLimit,
+                });
 
                 return (
                     <View style={{ gap: 20 }}>
@@ -620,9 +728,9 @@ export default function OnboardingScreen() {
                                 היעדים היומיים שלך
                             </Text>
                             {[
-                                { label: "קלוריות", value: `${goals.calories}`, color: "#F97316" },
-                                { label: "שומן", value: `${goals.fat}g`, color: C.green },
-                                { label: "חלבון", value: `${goals.protein}g`, color: "#3b82f6" },
+                                { label: "קלוריות", value: `${computedGoals.calories}`, color: "#F97316" },
+                                { label: "שומן", value: `${computedGoals.fat}g`, color: C.green },
+                                { label: "חלבון", value: `${computedGoals.protein}g`, color: "#3b82f6" },
                                 { label: "פחמימות (מקסימום)", value: `${carbLimit}g`, color: C.amber },
                             ].map((row, i) => (
                                 <View
@@ -739,12 +847,12 @@ export default function OnboardingScreen() {
                             style={{
                                 flex: 1,
                                 backgroundColor: C.card,
-                                borderRadius: 18,
+                                borderRadius: 16,
                                 paddingVertical: 16,
                                 flexDirection: "row-reverse",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                gap: 6,
+                                gap: 12,
                                 borderWidth: 1,
                                 borderColor: C.border,
                             }}
@@ -771,12 +879,12 @@ export default function OnboardingScreen() {
                         style={{
                             flex: 1.5,
                             backgroundColor: canProceed() ? C.maroon : C.card2,
-                            borderRadius: 18,
+                            borderRadius: 16,
                             paddingVertical: 16,
                             flexDirection: "row-reverse",
                             alignItems: "center",
                             justifyContent: "center",
-                            gap: 6,
+                            gap: 12,
                             shadowColor: canProceed() ? C.maroon : "transparent",
                             shadowOffset: { width: 0, height: 4 },
                             shadowOpacity: 0.35,

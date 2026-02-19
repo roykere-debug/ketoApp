@@ -25,6 +25,7 @@ type MealsState = {
     meals: Meal[];
     dailyGoals: DailyGoals;
     addMeal: (meal: Omit<Meal, 'id' | 'timestamp'>) => void;
+    updateMeal: (id: string, updates: Partial<Omit<Meal, 'id' | 'timestamp'>>) => void;
     removeMeal: (id: string) => void;
     clearTodaysMeals: () => void;
     setDailyGoals: (goals: Partial<DailyGoals>) => void;
@@ -65,6 +66,14 @@ export const useMealsStore = create<MealsState>()(
                 };
                 set((state) => ({
                     meals: [newMeal, ...state.meals],
+                }));
+            },
+
+            updateMeal: (id, updates) => {
+                set((state) => ({
+                    meals: state.meals.map((m) =>
+                        m.id === id ? { ...m, ...updates } : m
+                    ),
                 }));
             },
 

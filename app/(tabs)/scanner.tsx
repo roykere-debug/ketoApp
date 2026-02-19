@@ -1,12 +1,13 @@
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRef, useState } from 'react';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import { useRef, useState, useCallback } from 'react';
 import { View, TouchableOpacity, Modal, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { Text } from '../../components/ui/Text';
 import { analyzeImage, FoodAnalysis } from '../../services/ai';
+import { searchByBarcode, lookupBarcodeExternal, addCustomFoodItem, type FoodItem } from '../../services/foods';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMealsStore } from '../../store/mealsStore';
 import { useRouter } from 'expo-router';
-import { Camera, X, Plus } from 'lucide-react-native';
+import { Camera, X, Plus, ScanBarcode } from 'lucide-react-native';
 
 const C = {
     bg: "#0A0A0C",
@@ -37,7 +38,7 @@ function scoreLabel(s: number) {
 
 function ScanCorner({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
     const W = 32;
-    const T = 3;
+    const T = 4;
     const isTop = position.startsWith('t');
     const isLeft = position.endsWith('l');
 
@@ -81,13 +82,106 @@ function ScanCorner({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
     );
 }
 
+type ScanMode = 'camera' | 'barcode';
+
+type BarcodeResult = {
+    name: string;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+    servingSize: string;
+    brand: string | null;
+    barcode: string;
+    fromDb: boolean;
+};
+
 export default function ScannerScreen() {
     const cameraRef = useRef<CameraView>(null);
     const [permission, requestPermission] = useCameraPermissions();
     const [analyzing, setAnalyzing] = useState(false);
     const [result, setResult] = useState<FoodAnalysis | null>(null);
+    const [scanMode, setScanMode] = useState<ScanMode>('camera');
+    const [barcodeResult, setBarcodeResult] = useState<BarcodeResult | null>(null);
+    const [barcodeProcessing, setBarcodeProcessing] = useState(false);
+    const lastScannedBarcode = useRef<string>('');
     const addMeal = useMealsStore((state) => state.addMeal);
     const router = useRouter();
+
+    const handleBarcodeScanned = useCallback(async ({ data }: BarcodeScanningResult) => {
+        if (barcodeProcessing || data === lastScannedBarcode.current) return;
+        lastScannedBarcode.current = data;
+        setBarcodeProcessing(true);
+
+        try {
+            let item: FoodItem | null = await searchByBarcode(data);
+            let fromDb = true;
+
+            if (!item) {
+                fromDb = false;
+                item = await lookupBarcodeExternal(data);
+            }
+
+            if (item) {
+                setBarcodeResult({
+                    name: item.name_hebrew || item.name,
+                    calories: item.calories,
+                    protein: item.protein,
+                    fat: item.fat,
+                    carbs: item.carbs,
+                    servingSize: item.serving_size,
+                    brand: item.brand,
+                    barcode: data,
+                    fromDb,
+                });
+
+                if (!fromDb) {
+                    addCustomFoodItem({
+                        name: item.name,
+                        name_hebrew: item.name_hebrew,
+                        calories: item.calories,
+                        protein: item.protein,
+                        fat: item.fat,
+                        carbs: item.carbs,
+                        fiber: item.fiber,
+                        sugar: item.sugar,
+                        serving_size: item.serving_size,
+                        category: item.category,
+                        brand: item.brand,
+                        barcode: data,
+                    });
+                }
+            } else {
+                Alert.alert("לא נמצא", "המוצר לא נמצא במאגר. נסה לצלם את המנה במצב מצלמה.", [
+                    { text: "עבור למצלמה", onPress: () => setScanMode('camera') },
+                    { text: "סגור" },
+                ]);
+            }
+        } catch {
+            Alert.alert("שגיאה", "לא הצלחנו לחפש את הברקוד. נסה שוב.");
+        } finally {
+            setBarcodeProcessing(false);
+        }
+    }, [barcodeProcessing]);
+
+    const handleAddBarcodeItem = () => {
+        if (barcodeResult) {
+            const ketoScore = barcodeResult.carbs <= 5 ? 9 : barcodeResult.carbs <= 10 ? 7 : barcodeResult.carbs <= 20 ? 5 : 3;
+            addMeal({
+                name: barcodeResult.name,
+                calories: barcodeResult.calories,
+                protein: barcodeResult.protein,
+                fat: barcodeResult.fat,
+                carbs: barcodeResult.carbs,
+                ketoScore,
+            });
+            setBarcodeResult(null);
+            lastScannedBarcode.current = '';
+            Alert.alert("נוסף!", `${barcodeResult.name} נוסף ליומן שלך`, [
+                { text: "מעולה", onPress: () => router.push("/(tabs)") },
+            ]);
+        }
+    };
 
     if (!permission) {
         return <View style={{ flex: 1, backgroundColor: C.bg }} />;
@@ -100,7 +194,7 @@ export default function ScannerScreen() {
                     style={{
                         width: 100,
                         height: 100,
-                        borderRadius: 28,
+                        borderRadius: 24,
                         backgroundColor: `${C.maroon}18`,
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -179,10 +273,18 @@ export default function ScannerScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: '#000' }}>
-            <CameraView ref={cameraRef} style={{ flex: 1 }} facing="back">
+            <CameraView
+                ref={cameraRef}
+                style={{ flex: 1 }}
+                facing="back"
+                barcodeScannerSettings={scanMode === 'barcode' ? {
+                    barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39'],
+                } : undefined}
+                onBarcodeScanned={scanMode === 'barcode' ? handleBarcodeScanned : undefined}
+            >
                 <SafeAreaView style={{ flex: 1, justifyContent: 'space-between' }}>
-                    {/* Top label */}
-                    <View style={{ alignItems: 'center', paddingTop: 16 }}>
+                    {/* Top: label + mode toggle */}
+                    <View style={{ alignItems: 'center', paddingTop: 16, gap: 12 }}>
                         <View
                             style={{
                                 backgroundColor: 'rgba(0,0,0,0.65)',
@@ -194,14 +296,53 @@ export default function ScannerScreen() {
                             }}
                         >
                             <Text style={{ color: '#fff', fontSize: 15, fontFamily: 'Assistant_700Bold' }}>
-                                כוון את המצלמה לאוכל
+                                {scanMode === 'camera' ? 'כוון את המצלמה לאוכל' : 'כוון את המצלמה לברקוד'}
                             </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity
+                                onPress={() => { setScanMode('camera'); lastScannedBarcode.current = ''; }}
+                                activeOpacity={0.7}
+                                style={{
+                                    flexDirection: 'row-reverse',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    backgroundColor: scanMode === 'camera' ? 'rgba(128,0,32,0.7)' : 'rgba(0,0,0,0.5)',
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 12,
+                                    borderRadius: 16,
+                                    borderWidth: 1,
+                                    borderColor: scanMode === 'camera' ? 'rgba(128,0,32,0.8)' : 'rgba(255,255,255,0.15)',
+                                }}
+                            >
+                                <Camera size={16} color="#fff" />
+                                <Text style={{ color: '#fff', fontSize: 13, fontFamily: 'Assistant_700Bold' }}>מצלמה</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => { setScanMode('barcode'); lastScannedBarcode.current = ''; }}
+                                activeOpacity={0.7}
+                                style={{
+                                    flexDirection: 'row-reverse',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    backgroundColor: scanMode === 'barcode' ? 'rgba(128,0,32,0.7)' : 'rgba(0,0,0,0.5)',
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 12,
+                                    borderRadius: 16,
+                                    borderWidth: 1,
+                                    borderColor: scanMode === 'barcode' ? 'rgba(128,0,32,0.8)' : 'rgba(255,255,255,0.15)',
+                                }}
+                            >
+                                <ScanBarcode size={16} color="#fff" />
+                                <Text style={{ color: '#fff', fontSize: 13, fontFamily: 'Assistant_700Bold' }}>ברקוד</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* Scan frame */}
                     <View style={{ alignItems: 'center' }}>
-                        <View style={{ width: 220, height: 220, position: 'relative' }}>
+                        <View style={{ width: 220, height: scanMode === 'barcode' ? 120 : 220, position: 'relative' }}>
                             <ScanCorner position="tl" />
                             <ScanCorner position="tr" />
                             <ScanCorner position="bl" />
@@ -209,37 +350,50 @@ export default function ScannerScreen() {
                         </View>
                     </View>
 
-                    {/* Shutter */}
+                    {/* Shutter (camera mode) or loading (barcode mode) */}
                     <View style={{ alignItems: 'center', paddingBottom: 48 }}>
-                        <TouchableOpacity
-                            onPress={handleScan}
-                            activeOpacity={0.8}
-                            style={{
-                                width: 80,
-                                height: 80,
-                                borderRadius: 40,
-                                borderWidth: 4,
-                                borderColor: 'rgba(255,255,255,0.7)',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                            }}
-                        >
-                            <View
-                                style={{
-                                    width: 60,
-                                    height: 60,
-                                    borderRadius: 30,
-                                    backgroundColor: '#fff',
-                                    shadowColor: '#fff',
-                                    shadowOffset: { width: 0, height: 0 },
-                                    shadowOpacity: 0.4,
-                                    shadowRadius: 10,
-                                }}
-                            />
-                        </TouchableOpacity>
-                        <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 14, fontFamily: 'Assistant_400Regular' }}>
-                            לחץ לצילום
-                        </Text>
+                        {scanMode === 'camera' ? (
+                            <>
+                                <TouchableOpacity
+                                    onPress={handleScan}
+                                    activeOpacity={0.8}
+                                    style={{
+                                        width: 80,
+                                        height: 80,
+                                        borderRadius: 40,
+                                        borderWidth: 4,
+                                        borderColor: 'rgba(255,255,255,0.7)',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            width: 60,
+                                            height: 60,
+                                            borderRadius: 28,
+                                            backgroundColor: '#fff',
+                                            shadowColor: '#fff',
+                                            shadowOffset: { width: 0, height: 0 },
+                                            shadowOpacity: 0.4,
+                                            shadowRadius: 10,
+                                        }}
+                                    />
+                                </TouchableOpacity>
+                                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 16, fontFamily: 'Assistant_400Regular' }}>
+                                    לחץ לצילום
+                                </Text>
+                            </>
+                        ) : (
+                            <>
+                                {barcodeProcessing && (
+                                    <ActivityIndicator size="large" color={C.maroon} />
+                                )}
+                                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 16, fontFamily: 'Assistant_400Regular' }}>
+                                    {barcodeProcessing ? 'מחפש מוצר...' : 'כוון את הברקוד למסגרת'}
+                                </Text>
+                            </>
+                        )}
                     </View>
                 </SafeAreaView>
             </CameraView>
@@ -250,7 +404,7 @@ export default function ScannerScreen() {
                     <View
                         style={{
                             backgroundColor: C.card,
-                            borderRadius: 28,
+                            borderRadius: 24,
                             padding: 36,
                             alignItems: 'center',
                             width: '100%',
@@ -315,7 +469,7 @@ export default function ScannerScreen() {
                                 <View
                                     style={{
                                         backgroundColor: C.card,
-                                        borderRadius: 28,
+                                        borderRadius: 24,
                                         padding: 28,
                                         alignItems: 'center',
                                         marginBottom: 16,
@@ -361,14 +515,14 @@ export default function ScannerScreen() {
                                 <View
                                     style={{
                                         backgroundColor: C.card,
-                                        borderRadius: 28,
+                                        borderRadius: 24,
                                         padding: 24,
                                         marginBottom: 16,
                                         borderWidth: 1,
                                         borderColor: C.border,
                                     }}
                                 >
-                                    <Text style={{ color: C.text, fontSize: 24, fontFamily: 'Assistant_700Bold', textAlign: 'right', marginBottom: 10 }}>
+                                    <Text style={{ color: C.text, fontSize: 24, fontFamily: 'Assistant_700Bold', textAlign: 'right', marginBottom: 12 }}>
                                         {result.name}
                                     </Text>
                                     <Text style={{ color: C.textDim, fontSize: 14, fontFamily: 'Assistant_400Regular', textAlign: 'right', lineHeight: 22, marginBottom: 20 }}>
@@ -387,7 +541,7 @@ export default function ScannerScreen() {
                                                 flexDirection: 'row-reverse',
                                                 justifyContent: 'space-between',
                                                 alignItems: 'center',
-                                                paddingVertical: 14,
+                                                paddingVertical: 16,
                                                 borderTopWidth: i === 0 ? 1 : 0,
                                                 borderBottomWidth: 1,
                                                 borderColor: C.border,
@@ -420,7 +574,7 @@ export default function ScannerScreen() {
                                         elevation: 8,
                                         flexDirection: 'row-reverse',
                                         justifyContent: 'center',
-                                        gap: 10,
+                                        gap: 12,
                                     }}
                                 >
                                     <Plus size={20} color="#fff" strokeWidth={2.5} />
@@ -443,6 +597,159 @@ export default function ScannerScreen() {
                                 >
                                     <Text style={{ color: C.textDim, fontSize: 16, fontFamily: 'Assistant_700Bold' }}>
                                         צלם שוב
+                                    </Text>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        </SafeAreaView>
+                    </View>
+                )}
+            </Modal>
+
+            {/* Barcode result modal */}
+            <Modal visible={!!barcodeResult} animationType="slide" presentationStyle="pageSheet">
+                {barcodeResult && (
+                    <View style={{ flex: 1, backgroundColor: C.bg }}>
+                        <SafeAreaView style={{ flex: 1 }}>
+                            <View
+                                style={{
+                                    flexDirection: 'row-reverse',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    paddingHorizontal: 20,
+                                    paddingVertical: 16,
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: C.border,
+                                }}
+                            >
+                                <Text style={{ color: C.text, fontSize: 20, fontFamily: 'Assistant_700Bold' }}>
+                                    מוצר נמצא
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => { setBarcodeResult(null); lastScannedBarcode.current = ''; }}
+                                    activeOpacity={0.7}
+                                    style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 12,
+                                        backgroundColor: C.card2,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderWidth: 1,
+                                        borderColor: C.border,
+                                    }}
+                                >
+                                    <X size={20} color={C.textDim} strokeWidth={2} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView
+                                contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                <View
+                                    style={{
+                                        backgroundColor: C.card,
+                                        borderRadius: 24,
+                                        padding: 24,
+                                        marginBottom: 16,
+                                        borderWidth: 1,
+                                        borderColor: C.border,
+                                    }}
+                                >
+                                    <Text style={{ color: C.text, fontSize: 24, fontFamily: 'Assistant_700Bold', textAlign: 'right', marginBottom: 8 }}>
+                                        {barcodeResult.name}
+                                    </Text>
+                                    {barcodeResult.brand && (
+                                        <Text style={{ color: C.textDim, fontSize: 14, fontFamily: 'Assistant_400Regular', textAlign: 'right', marginBottom: 4 }}>
+                                            {barcodeResult.brand}
+                                        </Text>
+                                    )}
+                                    <Text style={{ color: C.textDimmer, fontSize: 12, fontFamily: 'Assistant_400Regular', textAlign: 'right', marginBottom: 20 }}>
+                                        {barcodeResult.servingSize} · {barcodeResult.barcode}
+                                    </Text>
+
+                                    {[
+                                        { label: 'קלוריות', value: `${barcodeResult.calories}`, color: C.orange },
+                                        { label: 'פחמימות', value: `${barcodeResult.carbs}g`, color: barcodeResult.carbs > 10 ? C.red : C.green },
+                                        { label: 'שומן', value: `${barcodeResult.fat}g`, color: C.green },
+                                        { label: 'חלבון', value: `${barcodeResult.protein}g`, color: C.blue },
+                                    ].map((row, i) => (
+                                        <View
+                                            key={i}
+                                            style={{
+                                                flexDirection: 'row-reverse',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                paddingVertical: 16,
+                                                borderTopWidth: i === 0 ? 1 : 0,
+                                                borderBottomWidth: 1,
+                                                borderColor: C.border,
+                                            }}
+                                        >
+                                            <Text style={{ color: C.textDim, fontSize: 15, fontFamily: 'Assistant_400Regular' }}>
+                                                {row.label}
+                                            </Text>
+                                            <Text style={{ color: row.color, fontSize: 18, fontFamily: 'Assistant_700Bold' }}>
+                                                {row.value}
+                                            </Text>
+                                        </View>
+                                    ))}
+
+                                    {!barcodeResult.fromDb && (
+                                        <View style={{
+                                            marginTop: 16,
+                                            backgroundColor: `${C.amber}15`,
+                                            borderRadius: 12,
+                                            padding: 12,
+                                            borderWidth: 1,
+                                            borderColor: `${C.amber}25`,
+                                        }}>
+                                            <Text style={{ color: C.amber, fontSize: 12, fontFamily: 'Assistant_400Regular', textAlign: 'right' }}>
+                                                הנתונים מ-Open Food Facts (ל-100 גרם). המוצר נשמר למאגר המקומי.
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={handleAddBarcodeItem}
+                                    activeOpacity={0.8}
+                                    style={{
+                                        backgroundColor: C.maroon,
+                                        borderRadius: 20,
+                                        paddingVertical: 18,
+                                        alignItems: 'center',
+                                        marginBottom: 12,
+                                        shadowColor: C.maroon,
+                                        shadowOffset: { width: 0, height: 6 },
+                                        shadowOpacity: 0.4,
+                                        shadowRadius: 14,
+                                        elevation: 8,
+                                        flexDirection: 'row-reverse',
+                                        justifyContent: 'center',
+                                        gap: 12,
+                                    }}
+                                >
+                                    <Plus size={20} color="#fff" strokeWidth={2.5} />
+                                    <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Assistant_700Bold' }}>
+                                        הוסף ליומן
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={() => { setBarcodeResult(null); lastScannedBarcode.current = ''; }}
+                                    activeOpacity={0.7}
+                                    style={{
+                                        backgroundColor: C.card,
+                                        borderRadius: 20,
+                                        paddingVertical: 18,
+                                        alignItems: 'center',
+                                        borderWidth: 1,
+                                        borderColor: C.border,
+                                    }}
+                                >
+                                    <Text style={{ color: C.textDim, fontSize: 16, fontFamily: 'Assistant_700Bold' }}>
+                                        סרוק שוב
                                     </Text>
                                 </TouchableOpacity>
                             </ScrollView>

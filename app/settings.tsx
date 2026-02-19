@@ -66,13 +66,13 @@ function SettingLink({
                 flexDirection: "row-reverse",
                 justifyContent: "space-between",
                 alignItems: "center",
-                paddingVertical: 14,
+                paddingVertical: 16,
                 borderBottomWidth: 1,
                 borderBottomColor: C.border,
             }}
         >
             <View style={{ flex: 1, alignItems: "flex-end" }}>
-                <Text style={{ color: C.text, fontSize: 15, fontFamily: "Assistant_400Regular", marginBottom: 2 }}>
+                <Text style={{ color: C.text, fontSize: 15, fontFamily: "Assistant_400Regular", marginBottom: 4 }}>
                     {label}
                 </Text>
                 {subtitle && (
@@ -189,7 +189,7 @@ export default function SettingsScreen() {
                         style={{
                             width: 60,
                             height: 60,
-                            borderRadius: 18,
+                            borderRadius: 16,
                             backgroundColor: `${C.maroon}20`,
                             alignItems: "center",
                             justifyContent: "center",
@@ -259,7 +259,7 @@ export default function SettingsScreen() {
                     style={{
                         backgroundColor: C.card2,
                         borderRadius: 20,
-                        padding: 18,
+                        padding: 16,
                         alignItems: "center",
                         borderWidth: 1,
                         borderColor: C.border,

@@ -1,8 +1,9 @@
 import { View, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "../../components/ui/Text";
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { getCoachResponse } from "../../services/ai";
+import { useMealsStore } from "../../store/mealsStore";
 import { Send } from "lucide-react-native";
 
 const C = {
@@ -18,11 +19,35 @@ const C = {
 
 export default function CoachScreen() {
     const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([
-        { role: 'assistant', text: 'היי! אני המאמן האישי שלך לתזונה קטוגנית. מה אכלת היום, או איך אני יכול לעזור?' },
+        { role: 'assistant', text: 'היי! אני המאמן האישי שלך לתזונה קטוגנית. אני יודע מה אכלת היום ואיך הציון שלך - שאל אותי כל דבר!' },
     ]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const scrollRef = useRef<ScrollView>(null);
+
+    const getTodaysMeals = useMealsStore((s) => s.getTodaysMeals);
+    const getTodaysTotals = useMealsStore((s) => s.getTodaysTotals);
+    const getTodaysKetoScore = useMealsStore((s) => s.getTodaysKetoScore);
+    const dailyGoals = useMealsStore((s) => s.dailyGoals);
+    const getRemaining = useMealsStore((s) => s.getRemaining);
+
+    const buildMealContext = useCallback(() => {
+        const todaysMeals = getTodaysMeals();
+        const totals = getTodaysTotals();
+        const ketoScore = getTodaysKetoScore();
+        const remaining = getRemaining();
+
+        const mealsList = todaysMeals.length > 0
+            ? todaysMeals.map((m) => `- ${m.name}: ${m.calories} קל׳, ${m.carbs}g פחמ׳, ${m.fat}g שומן, ${m.protein}g חלבון (ציון: ${m.ketoScore})`).join("\n")
+            : "לא נוספו ארוחות עדיין";
+
+        return `ציון קיטו יומי: ${ketoScore}/10
+צריכה היום: ${totals.calories} קל׳ | ${totals.carbs}g פחמ׳ | ${totals.fat}g שומן | ${totals.protein}g חלבון
+יעדים יומיים: ${dailyGoals.calories} קל׳ | ${dailyGoals.carbs}g פחמ׳ | ${dailyGoals.fat}g שומן | ${dailyGoals.protein}g חלבון
+נותר: ${remaining.calories} קל׳ | ${remaining.carbs}g פחמ׳ | ${remaining.fat}g שומן | ${remaining.protein}g חלבון
+ארוחות היום:
+${mealsList}`;
+    }, [getTodaysMeals, getTodaysTotals, getTodaysKetoScore, dailyGoals, getRemaining]);
 
     const handleSend = async () => {
         if (!input.trim() || loading) return;
@@ -32,7 +57,8 @@ export default function CoachScreen() {
         setLoading(true);
 
         try {
-            const response = await getCoachResponse([], userMsg);
+            const mealContext = buildMealContext();
+            const response = await getCoachResponse(messages, userMsg, mealContext);
             setMessages((prev) => [...prev, { role: 'assistant', text: response }]);
         } catch {
             setMessages((prev) => [...prev, { role: 'assistant', text: 'סליחה, משהו השתבש. נסה שוב.' }]);
